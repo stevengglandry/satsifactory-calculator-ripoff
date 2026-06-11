@@ -484,6 +484,8 @@ export class LocalProductionSolver
 				throw new Error('No feasible production plan found.');
 			}
 		}
+		// Zero-valued artificial variables can remain basic after phase one; pivot them out before phase two.
+		LocalProductionSolver.pivotArtificialVariablesOut(rows, basis, artificialOffset);
 
 		const phaseTwoObjective = new Array(totalVariableCount).fill(0) as number[];
 		for (let i = 0; i < objective.length; i++) {
@@ -501,6 +503,27 @@ export class LocalProductionSolver
 		}
 
 		return phaseTwo;
+	}
+
+	private static pivotArtificialVariablesOut(rows: number[][], basis: number[], artificialOffset: number): void
+	{
+		for (let i = 0; i < basis.length; i++) {
+			if (basis[i] < artificialOffset) {
+				continue;
+			}
+
+			let entering = -1;
+			for (let j = 0; j < artificialOffset; j++) {
+				if (Math.abs(rows[i][j]) > LocalProductionSolver.EPSILON) {
+					entering = j;
+					break;
+				}
+			}
+
+			if (entering !== -1) {
+				LocalProductionSolver.pivot(rows, new Array(rows[i].length).fill(0) as number[], basis, i, entering);
+			}
+		}
 	}
 
 	private static optimize(rows: number[][], basis: number[], objective: number[]): ISimplexResult
