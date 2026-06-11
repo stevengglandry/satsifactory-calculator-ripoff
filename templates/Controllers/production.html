@@ -261,6 +261,117 @@
 
 				<div class="col-md-10" ng-show="ctrl.tab.tab === 'items'">
 					<div class="row">
+						<div class="col-md-12">
+							<div class="card mb-3">
+								<h3 class="card-header card-header-with-buttons">
+									<span class="card-header-text">
+										Nodes / Miners
+									</span>
+
+									<span class="btn-group">
+										<span class="btn btn-secondary px-3" ng-click="ctrl.tab.clearResourceNodes()">
+											Clear
+										</span>
+									</span>
+								</h3>
+								<div class="card-body">
+									<p>
+										Add nearby resource nodes here. These rows calculate raw resource limits automatically; water and nitrogen can still be adjusted in Raw resources.
+									</p>
+
+									<div class="node-resource-table-wrapper">
+										<table class="node-resource-table">
+											<thead>
+												<tr>
+													<th>
+														Resource
+													</th>
+													<th>
+														Nodes
+													</th>
+													<th>
+														Purity
+													</th>
+													<th>
+														Miner
+													</th>
+													<th>
+														Clock
+													</th>
+													<th>
+														Limit
+													</th>
+													<th></th>
+												</tr>
+											</thead>
+											<tbody>
+												<tr ng-repeat="node in ctrl.tab.resourceNodes track by $index">
+													<td>
+														<ui-select ng-model="node.item" class="production-item-picker" on-select="ctrl.tab.updateResourceNode(node)">
+															<ui-select-match placeholder="Search or select resource">
+																<span>
+																	<item-icon dynamic="true" item="$select.selected.className" class="mr-2" size="24" hide-tooltip="true"></item-icon>
+																	{{$select.selected.name}}
+																</span>
+															</ui-select-match>
+															<ui-select-choices repeat="item.className as item in (ctrl.nodeLimitedResourceItems|filter:{name:$select.search}) track by item.className">
+																<item-icon item="item" hide-tooltip="true"></item-icon>
+																<span class="pl-2" ng-bind="item.name"></span>
+															</ui-select-choices>
+														</ui-select>
+													</td>
+													<td class="node-count-cell">
+														<span class="btn-group">
+															<span class="btn btn-secondary" ng-click="ctrl.tab.changeResourceNodeAmount(node, -1)" tooltip title="Remove one node">
+																<span class="fas fa-minus"></span>
+															</span>
+															<span class="btn btn-outline-light node-count">{{node.amount}}</span>
+															<span class="btn btn-secondary" ng-click="ctrl.tab.changeResourceNodeAmount(node, 1)" tooltip title="Add one node">
+																<span class="fas fa-plus"></span>
+															</span>
+														</span>
+													</td>
+													<td>
+														<span class="btn-group purity-toggle">
+															<span ng-repeat="purity in ctrl.tab.resourcePurities" ng-class="{btn: true, 'btn-success': node.purity === purity, 'btn-secondary': node.purity !== purity}" ng-click="ctrl.tab.setResourceNodePurity(node, purity)">
+																{{purity}}
+															</span>
+														</span>
+													</td>
+													<td>
+														<select class="form-control" ng-model="node.miner" ng-options="miner.className as ctrl.tab.getMinerName(miner.className) for miner in ctrl.tab.getAvailableMinersForNode(node)" ng-change="ctrl.tab.updateResourceNode(node)" ng-disabled="!node.item"></select>
+													</td>
+													<td>
+														<select class="form-control" ng-model="node.overclock" ng-options="clock as clock + '%' for clock in ctrl.tab.resourceNodeOverclockOptions" ng-change="ctrl.tab.setResourceNodeOverclock(node, node.overclock)"></select>
+													</td>
+													<td class="text-right text-nowrap">
+														{{ctrl.tab.getResourceNodeTotal(node)|number}} / min
+													</td>
+													<td class="text-nowrap">
+														<span class="btn btn-success" ng-click="ctrl.tab.cloneResourceNode(node)" tooltip title="Clone node row">
+															<span class="far fa-fw fa-clone"></span>
+														</span>
+														<span class="btn btn-danger" ng-click="ctrl.tab.removeResourceNode(node)" tooltip title="Remove node row">
+															<span class="fas fa-fw fa-times"></span>
+														</span>
+													</td>
+												</tr>
+												<tr>
+													<td colspan="6">
+														<span class="btn btn-outline-success btn-block" ng-click="ctrl.tab.addEmptyResourceNode()">
+															<span class="fas fa-plus"></span>
+															Add resource node
+														</span>
+													</td>
+													<td></td>
+												</tr>
+											</tbody>
+										</table>
+									</div>
+								</div>
+							</div>
+						</div>
+
 						<div class="col-md-6">
 							<div class="card">
 								<h3 class="card-header card-header-with-buttons">

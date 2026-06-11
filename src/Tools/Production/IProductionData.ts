@@ -29,6 +29,8 @@ export interface IProductionDataRequest
 
 	sinkableResources: string[]; // whether or not you can sink a given resource
 
+	resourceNodes?: IProductionDataResourceNode[]; // node-based raw resource limits
+
 	production: IProductionDataRequestItem[];
 	input: IProductionDataRequestInput[];
 
@@ -56,6 +58,17 @@ export interface IProductionDataRequestInput
 
 	item: string|null; // classname of the item
 	amount: number; // amount of items/min
+
+}
+
+export interface IProductionDataResourceNode
+{
+
+	item: string|null; // classname of the raw resource
+	amount: number; // number of nodes
+	purity: string;
+	miner: string|null; // classname of the extractor/miner
+	overclock: number;
 
 }
 

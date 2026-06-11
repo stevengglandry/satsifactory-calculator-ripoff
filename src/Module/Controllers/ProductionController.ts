@@ -27,6 +27,14 @@ export class ProductionController
 	public importFiles: File[] = [];
 
 	public readonly rawResources: IResourceSchema[] = data.getResources();
+	public readonly nodeLimitedResources: IResourceSchema[] = data.getResources().filter((resource) => {
+		return Object.values(data.getRawData().miners).some((miner) => {
+			return miner.allowedResources.indexOf(resource.item) !== -1;
+		});
+	});
+	public readonly nodeLimitedResourceItems: IItemSchema[] = this.nodeLimitedResources.map((resource) => {
+		return data.getItemByClassName(resource.item) as IItemSchema;
+	});
 	public readonly craftableItems: IItemSchema[] = model.getAutomatableItems();
 	public readonly inputableItems: IItemSchema[] = model.getInputableItems();
 	public readonly sinkableItems: IItemSchema[] = data.getSinkableItems();
