@@ -35,6 +35,7 @@ export class ProductionTab
 		powerExpanded: {},
 		itemsExpanded: {},
 		overviewCollapsed: {},
+		visualizationMode: 'diagram',
 	};
 
 	public tab: string = 'production';

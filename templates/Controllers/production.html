@@ -956,10 +956,25 @@
 		</div>
 
 		<div ng-show="ctrl.tab.resultTab === 'visualization'">
-			<div class="border-left border-right border-secondary p-2">
-				You can move the nodes around using drag'n'drop.
+			<div class="visualization-toolbar border-left border-right border-secondary p-2">
+				<span ng-if="ctrl.tab.state.visualizationMode === 'diagram'">
+					You can move the nodes around using drag'n'drop.
+				</span>
+				<span ng-if="ctrl.tab.state.visualizationMode === 'sankey'">
+					Connector width is proportional to the item amount moving between producers and consumers.
+				</span>
+				<span class="btn-group btn-group-sm">
+					<span ng-class="{btn: true, 'btn-success': ctrl.tab.state.visualizationMode === 'diagram', 'btn-secondary': ctrl.tab.state.visualizationMode !== 'diagram'}" ng-click="ctrl.tab.state.visualizationMode = 'diagram'">
+						<span class="fas fa-project-diagram mr-1"></span>
+						Diagram
+					</span>
+					<span ng-class="{btn: true, 'btn-success': ctrl.tab.state.visualizationMode === 'sankey', 'btn-secondary': ctrl.tab.state.visualizationMode !== 'sankey'}" ng-click="ctrl.tab.state.visualizationMode = 'sankey'">
+						<span class="fas fa-stream mr-1"></span>
+						Sankey
+					</span>
+				</span>
 			</div>
-			<visualization result="ctrl.tab.resultNew" ng-class="{visualization: 1, loading: ctrl.tab.state.resultLoading}"></visualization>
+			<visualization result="ctrl.tab.resultNew" mode="ctrl.tab.state.visualizationMode" ng-class="{visualization: 1, loading: ctrl.tab.state.resultLoading, 'visualization-sankey-active': ctrl.tab.state.visualizationMode === 'sankey'}"></visualization>
 		</div>
 
 		<div ng-show="ctrl.tab.resultTab === 'items'" class="visualization-result">

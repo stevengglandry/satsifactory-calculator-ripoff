@@ -81,6 +81,66 @@ a {
 	border: 1px solid #4e5d6c;
 }
 
+.visualization-sankey-active {
+	overflow: auto;
+}
+
+.visualization-sankey {
+	min-width: 100%;
+	height: 100%;
+	overflow: auto;
+
+	svg {
+		display: block;
+		background: #2b3e50;
+	}
+
+	.sankey-link {
+		fill: none;
+		opacity: 0.55;
+		stroke-linecap: round;
+
+		&:hover {
+			opacity: 0.9;
+		}
+	}
+
+	.sankey-link-label {
+		fill: #eeeeee;
+		font-size: 12px;
+		pointer-events: none;
+		text-anchor: middle;
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+	}
+
+	.sankey-node rect {
+		stroke: rgba(238, 238, 238, 0.35);
+		stroke-width: 1;
+	}
+
+	.sankey-node-label {
+		fill: #eeeeee;
+		font-size: 13px;
+		font-weight: 700;
+		pointer-events: none;
+	}
+
+	.sankey-node-value {
+		fill: rgba(238, 238, 238, 0.78);
+		font-size: 12px;
+		font-weight: 400;
+	}
+}
+
+.visualization-sankey-empty {
+	display: flex;
+	height: 100%;
+	align-items: center;
+	justify-content: center;
+	color: #eeeeee;
+	font-size: 1.25rem;
+}
+
 .filter-actions {
 	a {
 		margin: 10px 0;
