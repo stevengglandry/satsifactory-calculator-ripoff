@@ -101,11 +101,11 @@ a {
 
 	.sankey-link {
 		fill: none;
-		opacity: 0.55;
-		stroke-linecap: round;
+		opacity: 0.58;
+		stroke-linecap: butt;
 
 		&:hover {
-			opacity: 0.9;
+			opacity: 0.86;
 		}
 	}
 
@@ -121,12 +121,17 @@ a {
 		cursor: move;
 		touch-action: none;
 
-		rect {
+		.sankey-node-hitbox {
+			fill: transparent;
+			stroke: transparent;
+		}
+
+		.sankey-node-bar {
 			stroke: rgba(238, 238, 238, 0.35);
 			stroke-width: 1;
 		}
 
-		&.dragging rect {
+		&.dragging .sankey-node-bar {
 			stroke: rgba(238, 238, 238, 0.95);
 			stroke-width: 2;
 		}
@@ -134,9 +139,10 @@ a {
 
 	.sankey-node-label {
 		fill: #eeeeee;
-		font-size: 13px;
+		font-size: 12px;
 		font-weight: 700;
 		pointer-events: none;
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
 	}
 
 	.sankey-node-value {

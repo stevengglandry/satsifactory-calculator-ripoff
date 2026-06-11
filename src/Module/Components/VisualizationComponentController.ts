@@ -52,6 +52,12 @@ interface ISankeyPoint
 	y: number;
 }
 
+interface ISankeyLayout
+{
+	width: number;
+	height: number;
+}
+
 export class VisualizationComponentController implements IController
 {
 
@@ -282,10 +288,8 @@ export class VisualizationComponentController implements IController
 			return;
 		}
 
-		this.layoutSankey(graph.nodes, graph.edges);
+		const layout = this.layoutSankey(graph.nodes, graph.edges);
 
-		const width = Math.max(900, (this.getMaxLevel(graph.nodes) + 1) * 260);
-		const height = Math.max(760, this.getSankeyHeight(graph.nodes));
 		const paths: string[] = [];
 		const labels: string[] = [];
 
@@ -297,7 +301,7 @@ export class VisualizationComponentController implements IController
 				'</path>'
 			);
 
-			if (edge.width >= 8) {
+			if (edge.width >= 22) {
 				const label = this.getSankeyLabelPosition(edge);
 				labels.push(
 					'<text class="sankey-link-label" data-edge-id="' + edge.id + '" x="' + label.x + '" y="' + label.y + '">' +
@@ -310,12 +314,17 @@ export class VisualizationComponentController implements IController
 		const nodeMarkup: string[] = [];
 		for (const node of graph.nodes) {
 			const title = this.escapeSvg(node.label + '\nIn: ' + Strings.formatNumber(node.incoming) + ' / min\nOut: ' + Strings.formatNumber(node.outgoing) + ' / min');
+			const label = this.getSankeyNodeLabelPosition(node);
+			const hitBox = this.getSankeyNodeHitBox(node);
 			nodeMarkup.push(
 				'<g class="sankey-node sankey-node-' + node.type + '" data-node-id="' + node.id + '">' +
-					'<rect x="' + node.x + '" y="' + node.y + '" width="' + node.width + '" height="' + node.height + '" rx="4" ry="4" fill="' + node.color + '">' +
+					'<rect class="sankey-node-hitbox" x="' + hitBox.x + '" y="' + hitBox.y + '" width="' + hitBox.width + '" height="' + hitBox.height + '">' +
 						'<title>' + title + '</title>' +
 					'</rect>' +
-					'<text class="sankey-node-label" x="' + (node.x + 10) + '" y="' + (node.y + 18) + '">' +
+					'<rect class="sankey-node-bar" x="' + node.x + '" y="' + node.y + '" width="' + node.width + '" height="' + node.height + '" rx="2" ry="2" fill="' + node.color + '">' +
+						'<title>' + title + '</title>' +
+					'</rect>' +
+					'<text class="sankey-node-label" x="' + label.x + '" y="' + label.y + '">' +
 						this.getNodeLabelMarkup(node) +
 					'</text>' +
 				'</g>'
@@ -324,14 +333,14 @@ export class VisualizationComponentController implements IController
 
 		this.$element[0].innerHTML =
 			'<div class="visualization-sankey">' +
-				'<svg width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="Production Sankey graph">' +
+				'<svg width="' + layout.width + '" height="' + layout.height + '" viewBox="0 0 ' + layout.width + ' ' + layout.height + '" role="img" aria-label="Production Sankey graph">' +
 					'<g class="sankey-links">' + paths.join('') + '</g>' +
 					'<g class="sankey-link-labels">' + labels.join('') + '</g>' +
 					'<g class="sankey-nodes">' + nodeMarkup.join('') + '</g>' +
 				'</svg>' +
 			'</div>';
 
-		this.bindSankeyDragging(graph.nodes, graph.edges, width, height);
+		this.bindSankeyDragging(graph.nodes, graph.edges, layout.width, layout.height);
 	}
 
 	private drawVisualisation(nodes: DataSet<IVisNode>, edges: DataSet<IVisEdge>): Network
@@ -407,11 +416,6 @@ export class VisualizationComponentController implements IController
 			nodeMap[graphNode.id] = node;
 		}
 
-		let maxAmount = 0;
-		for (const edge of result.graph.edges) {
-			maxAmount = Math.max(maxAmount, edge.itemAmount.amount);
-		}
-
 		const edges: ISankeyEdge[] = [];
 		for (const graphEdge of result.graph.edges) {
 			if (graphEdge.itemAmount.amount <= 0) {
@@ -422,7 +426,6 @@ export class VisualizationComponentController implements IController
 			const to = nodeMap[graphEdge.to.id];
 			const amount = graphEdge.itemAmount.amount;
 			const itemName = model.getItem(graphEdge.itemAmount.item).prototype.name;
-			const width = maxAmount > 0 ? 2 + (amount / maxAmount) * 38 : 2;
 
 			from.outgoing += amount;
 			to.incoming += amount;
@@ -433,7 +436,7 @@ export class VisualizationComponentController implements IController
 				item: graphEdge.itemAmount.item,
 				itemName: itemName,
 				amount: amount,
-				width: width,
+				width: 0,
 				color: this.getItemColor(graphEdge.itemAmount.item),
 				sourceY: 0,
 				targetY: 0,
@@ -492,7 +495,7 @@ export class VisualizationComponentController implements IController
 			outgoing: 0,
 			x: 0,
 			y: 0,
-			width: 180,
+			width: 24,
 			height: 48,
 		};
 	}
@@ -546,12 +549,15 @@ export class VisualizationComponentController implements IController
 		}
 	}
 
-	private layoutSankey(nodes: ISankeyNode[], edges: ISankeyEdge[]): void
+	private layoutSankey(nodes: ISankeyNode[], edges: ISankeyEdge[]): ISankeyLayout
 	{
-		const nodeWidth = 180;
-		const columnGap = 80;
+		const nodeWidth = 24;
+		const columnGap = 236;
 		const topPadding = 42;
-		const nodePadding = 26;
+		const nodePadding = 18;
+		const leftPadding = 42;
+		const labelWidth = 210;
+		const targetMaxNodeHeight = 260;
 		const maxLevel = this.getMaxLevel(nodes);
 		const columns: {[key: number]: ISankeyNode[]} = {};
 
@@ -563,35 +569,43 @@ export class VisualizationComponentController implements IController
 			columns[node.level].push(node);
 		}
 
-		const height = Math.max(760, this.getSankeyHeight(nodes));
-		const scale = this.getSankeyValueScale(columns, height, topPadding, nodePadding);
+		const scale = this.getSankeyValueScale(nodes, targetMaxNodeHeight);
+		this.applySankeyScale(nodes, edges, scale);
+		const height = Math.max(760, this.getSankeyHeight(columns, topPadding, nodePadding));
+		const width = Math.max(900, leftPadding * 2 + maxLevel * (nodeWidth + columnGap) + nodeWidth + labelWidth);
 
 		for (let level = 0; level <= maxLevel; level++) {
 			const column = columns[level] || [];
 			column.sort((a, b) => {
-				const aSort = a.y || 0;
-				const bSort = b.y || 0;
+				const aSort = this.getSankeyNodeSortY(a, edges);
+				const bSort = this.getSankeyNodeSortY(b, edges);
 				if (aSort !== bSort) {
 					return aSort - bSort;
 				}
-				return a.label < b.label ? -1 : 1;
+				if (a.value !== b.value) {
+					return b.value - a.value;
+				}
+				return a.label.localeCompare(b.label);
 			});
 
 			let y = topPadding;
 			for (const node of column) {
-				node.x = 42 + level * (nodeWidth + columnGap);
-				node.height = Math.max(44, Math.min(180, node.value * scale));
+				node.x = leftPadding + level * (nodeWidth + columnGap);
 				node.y = y;
 				y += node.height + nodePadding;
 			}
 		}
 
 		this.positionSankeyLinks(nodes, edges);
+		return {
+			width: width,
+			height: height,
+		};
 	}
 
 	private positionSankeyLinks(nodes: ISankeyNode[], edges: ISankeyEdge[]): void
 	{
-		const gap = 2;
+		const gap = 0;
 		const outgoing: {[key: number]: ISankeyEdge[]} = {};
 		const incoming: {[key: number]: ISankeyEdge[]} = {};
 
@@ -622,32 +636,73 @@ export class VisualizationComponentController implements IController
 		}
 	}
 
-	private getSankeyValueScale(columns: {[key: number]: ISankeyNode[]}, height: number, topPadding: number, nodePadding: number): number
+	private getSankeyValueScale(nodes: ISankeyNode[], targetMaxNodeHeight: number): number
 	{
-		let scale = 10;
-		for (const level in columns) {
-			const column = columns[level];
-			let total = 0;
-			for (const node of column) {
-				total += node.value;
-			}
-			if (total > 0) {
-				const available = height - topPadding * 2 - Math.max(0, column.length - 1) * nodePadding;
-				scale = Math.min(scale, available / total);
-			}
+		let maxValue = 0;
+		for (const node of nodes) {
+			maxValue = Math.max(maxValue, node.value);
 		}
-		return Math.max(0.08, scale);
+		if (maxValue <= 0) {
+			return 1;
+		}
+		return targetMaxNodeHeight / maxValue;
 	}
 
-	private getSankeyHeight(nodes: ISankeyNode[]): number
+	private applySankeyScale(nodes: ISankeyNode[], edges: ISankeyEdge[], scale: number): void
 	{
-		const counts: {[key: number]: number} = {};
-		let maxCount = 0;
-		for (const node of nodes) {
-			counts[node.level] = (counts[node.level] || 0) + 1;
-			maxCount = Math.max(maxCount, counts[node.level]);
+		for (const edge of edges) {
+			edge.width = Math.max(1, edge.amount * scale);
 		}
-		return 84 + maxCount * 74;
+
+		const outgoing: {[key: number]: ISankeyEdge[]} = {};
+		const incoming: {[key: number]: ISankeyEdge[]} = {};
+		for (const node of nodes) {
+			outgoing[node.id] = [];
+			incoming[node.id] = [];
+		}
+		for (const edge of edges) {
+			outgoing[edge.from.id].push(edge);
+			incoming[edge.to.id].push(edge);
+		}
+
+		for (const node of nodes) {
+			node.height = Math.max(
+				14,
+				node.value * scale,
+				this.getLinkStackHeight(outgoing[node.id], 0),
+				this.getLinkStackHeight(incoming[node.id], 0)
+			);
+		}
+	}
+
+	private getSankeyHeight(columns: {[key: number]: ISankeyNode[]}, topPadding: number, nodePadding: number): number
+	{
+		let height = 0;
+		for (const level in columns) {
+			const column = columns[level];
+			let columnHeight = topPadding * 2 + Math.max(0, column.length - 1) * nodePadding;
+			for (const node of column) {
+				columnHeight += node.height;
+			}
+			height = Math.max(height, columnHeight);
+		}
+		return Math.ceil(height);
+	}
+
+	private getSankeyNodeSortY(node: ISankeyNode, edges: ISankeyEdge[]): number
+	{
+		let total = 0;
+		let weighted = 0;
+		for (const edge of edges) {
+			if (edge.to === node && edge.from.y > 0) {
+				total += edge.width;
+				weighted += (edge.from.y + edge.from.height / 2) * edge.width;
+			}
+		}
+		if (total > 0) {
+			return weighted / total;
+		}
+		return 0;
 	}
 
 	private getMaxLevel(nodes: ISankeyNode[]): number
@@ -682,6 +737,24 @@ export class VisualizationComponentController implements IController
 			' C ' + (sourceX + controlDistance * direction) + ' ' + edge.sourceY +
 			', ' + (targetX - controlDistance * direction) + ' ' + edge.targetY +
 			', ' + targetX + ' ' + edge.targetY;
+	}
+
+	private getSankeyNodeLabelPosition(node: ISankeyNode): ISankeyPoint
+	{
+		return {
+			x: node.x + node.width + 10,
+			y: node.y + Math.max(13, Math.min(18, node.height / 2 + 4)),
+		};
+	}
+
+	private getSankeyNodeHitBox(node: ISankeyNode): {x: number, y: number, width: number, height: number}
+	{
+		return {
+			x: node.x,
+			y: node.y - 6,
+			width: node.width + 190,
+			height: Math.max(36, node.height + 12),
+		};
 	}
 
 	private getSankeyLabelPosition(edge: ISankeyEdge): ISankeyPoint
@@ -791,7 +864,7 @@ export class VisualizationComponentController implements IController
 			}
 
 			const pointer = getPoint(event as MouseEvent|TouchEvent);
-			activeNode.x = Math.max(0, Math.min(width - activeNode.width, startNodeX + pointer.x - startPointer.x));
+			activeNode.x = Math.max(0, Math.min(width - activeNode.width - 190, startNodeX + pointer.x - startPointer.x));
 			activeNode.y = Math.max(0, Math.min(height - activeNode.height, startNodeY + pointer.y - startPointer.y));
 			this.positionSankeyLinks(nodes, edges);
 			this.updateSankeyNode(activeNode, svg);
@@ -830,19 +903,29 @@ export class VisualizationComponentController implements IController
 			return;
 		}
 
-		const rect = nodeElement.querySelector('rect');
-		if (rect) {
-			rect.setAttribute('x', node.x + '');
-			rect.setAttribute('y', node.y + '');
+		const bar = nodeElement.querySelector('.sankey-node-bar');
+		if (bar) {
+			bar.setAttribute('x', node.x + '');
+			bar.setAttribute('y', node.y + '');
+		}
+
+		const hitBox = nodeElement.querySelector('.sankey-node-hitbox');
+		if (hitBox) {
+			const bounds = this.getSankeyNodeHitBox(node);
+			hitBox.setAttribute('x', bounds.x + '');
+			hitBox.setAttribute('y', bounds.y + '');
+			hitBox.setAttribute('width', bounds.width + '');
+			hitBox.setAttribute('height', bounds.height + '');
 		}
 
 		const text = nodeElement.querySelector('text');
 		if (text) {
-			text.setAttribute('x', (node.x + 10) + '');
-			text.setAttribute('y', (node.y + 18) + '');
+			const label = this.getSankeyNodeLabelPosition(node);
+			text.setAttribute('x', label.x + '');
+			text.setAttribute('y', label.y + '');
 			const tspans = Array.from(text.querySelectorAll('tspan'));
 			for (const tspan of tspans) {
-				tspan.setAttribute('x', (node.x + 10) + '');
+				tspan.setAttribute('x', label.x + '');
 			}
 		}
 	}
@@ -866,10 +949,19 @@ export class VisualizationComponentController implements IController
 
 	private getNodeLabelMarkup(node: ISankeyNode): string
 	{
-		const label = this.escapeSvg(node.label);
+		const labelPosition = this.getSankeyNodeLabelPosition(node);
+		const label = this.escapeSvg(this.truncateSankeyLabel(node.label));
 		const amount = Strings.formatNumber(node.value) + ' / min';
-		return '<tspan x="' + (node.x + 10) + '" dy="0">' + label + '</tspan>' +
-			'<tspan class="sankey-node-value" x="' + (node.x + 10) + '" dy="18">' + this.escapeSvg(amount) + '</tspan>';
+		return '<tspan x="' + labelPosition.x + '" dy="0">' + label + '</tspan>' +
+			'<tspan class="sankey-node-value" x="' + labelPosition.x + '" dy="17">' + this.escapeSvg(amount) + '</tspan>';
+	}
+
+	private truncateSankeyLabel(label: string): string
+	{
+		if (label.length <= 27) {
+			return label;
+		}
+		return label.slice(0, 24) + '...';
 	}
 
 	private getItemColor(item: string): string
