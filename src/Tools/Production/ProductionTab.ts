@@ -69,6 +69,11 @@ export class ProductionTab
 		}, 400), true);
 	}
 
+	public get gameVersion(): string
+	{
+		return this.version;
+	}
+
 	public calculate($timeout?: ITimeoutService): void
 	{
 		let request = false;
@@ -101,6 +106,9 @@ export class ProductionTab
 					break;
 				case '1.0-ficsmas':
 					apiRequest.gameVersion = '1.0.0-ficsmas';
+					break;
+				case '1.2':
+					apiRequest.gameVersion = '1.2.0';
 					break;
 				default:
 					apiRequest.gameVersion = '1.0.0';

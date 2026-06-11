@@ -8,7 +8,7 @@ export default function parseBlueprintClass(blueprint: string): string
 		match = ['', blueprint];
 	}
 	if (match) {
-		const parts = match[1].split('.');
+		const parts = match[1].replace(/['"]/g, '').split('.');
 		return parts[parts.length - 1];
 	}
 	return 'Undefined';

@@ -11,10 +11,11 @@ export default function parseImageMapping(value: {
 {
 	const result = [];
 	for (const item of value) {
-		if (item.mPersistentBigIcon && item.mPersistentBigIcon !== 'None') {
+		const icon = item.mPersistentBigIcon || (item as any).mSmallIcon;
+		if (icon && icon !== 'None') {
 			result.push({
 				className: item.ClassName,
-				image: item.mPersistentBigIcon.replace('Texture2D /', '').replace(/\..*/, '.png'),
+				image: icon.replace('Texture2D /', '').replace(/\..*/, '.png'),
 			});
 		}
 

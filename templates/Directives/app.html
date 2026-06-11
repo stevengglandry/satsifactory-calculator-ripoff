@@ -63,6 +63,9 @@
 						<a class="dropdown-item" ng-class="{'active': $root.version == '1.0'}" ng-click="$root.changeVersion('1.0')">
 							1.0
 						</a>
+						<a class="dropdown-item" ng-class="{'active': $root.version == '1.2'}" ng-click="$root.changeVersion('1.2')">
+							1.2
+						</a>
 						<a class="dropdown-item" ng-class="{'active': $root.version == '1.0-ficsmas'}" ng-click="$root.changeVersion('1.0-ficsmas')">
 							1.0 (Ficsmas)
 						</a>
@@ -135,13 +138,13 @@
 			</div>
 			<div class="modal-body">
 				<p class="alert alert-danger">
-					<b>You're looking at Tools for Update 8!</b> If you want to calculate builds for full release (1.0), use the button below to switch.<br>
-					You can use the export/import functionality to move production lines to 1.0 Tools.
+					<b>You're looking at Tools for Update 8!</b> If you want to calculate builds for Update 1.2, use the button below to switch.<br>
+					You can use the export/import functionality to move production lines to 1.2 Tools.
 				</p>
 			</div>
 			<div class="modal-footer">
 				<button type="button" class="btn btn-danger" data-dismiss="modal">Stay on 0.8 Tools</button>
-				<a ng-click="changeVersion('1.0')" class="btn btn-success">Go to 1.0 Tools</a>
+				<a ng-click="changeVersion('1.2')" class="btn btn-success">Go to 1.2 Tools</a>
 			</div>
 		</div>
 	</div>

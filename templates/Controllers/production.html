@@ -590,7 +590,11 @@
 		</div>
 	</div>
 
-	<div ng-show="ctrl.tab.resultStatus === 'noResult' && !ctrl.tab.easter" class="visualization-result">
+	<div ng-show="ctrl.tab.resultStatus === 'noResult' && !ctrl.tab.easter && ctrl.tab.gameVersion === '1.2'" class="visualization-result">
+		The public Satisfactory Tools solver does not accept Update 1.2 requests yet.<br>
+		<span>The 1.2 items and recipes are loaded, but production calculations need a 1.2-capable solver backend.</span><br>
+	</div>
+	<div ng-show="ctrl.tab.resultStatus === 'noResult' && !ctrl.tab.easter && ctrl.tab.gameVersion !== '1.2'" class="visualization-result">
 		Unfortunately we couldn't calculate any result.<br>
 		<span>This can be due to many things: missing resource required for the production line, not enough resources for the requested amount, disabled recipes required for the product, etc.</span><br>
 	</div>

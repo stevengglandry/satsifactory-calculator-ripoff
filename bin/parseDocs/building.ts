@@ -46,6 +46,10 @@ export default function parseBuildings(buildings: {
 
 	const result: IBuildingSchema[] = [];
 	for (const building of buildings) {
+		if (!building.mDisplayName) {
+			continue;
+		}
+
 		if (ignored.indexOf(building.ClassName) !== -1) {
 			continue;
 		}

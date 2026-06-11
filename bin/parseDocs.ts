@@ -16,8 +16,75 @@ import {DiffFormatter} from '@src/Utils/DiffGenerator/DiffFormatter';
 import parseImageMapping from '@bin/parseDocs/imageMapping';
 import {Strings} from '@src/Utils/Strings';
 
-const docs = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'Docs.json')).toString());
-const oldData: IJsonSchema = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'data.json')).toString()) as IJsonSchema;
+function readJsonText(filePath: string): string
+{
+	const buffer = fs.readFileSync(filePath);
+	const content = buffer[0] === 0xff && buffer[1] === 0xfe
+		? buffer.toString('utf16le')
+		: buffer.toString('utf8');
+
+	return content.replace(/^\uFEFF/, '');
+}
+
+function nativeClassName(nativeClass: string): string
+{
+	const match = nativeClass.match(/\/Script\/FactoryGame\.([A-Za-z0-9_]+)/);
+	if (match) {
+		return match[1];
+	}
+
+	return nativeClass.replace(/^Class'\/Script\/FactoryGame\./, '').replace(/'$/, '');
+}
+
+function isItemDescriptor(nativeClass: string): boolean
+{
+	return [
+		'FGItemDescriptor',
+		'FGEquipmentDescriptor',
+		'FGConsumableDescriptor',
+		'FGItemDescriptorNuclearFuel',
+		'FGItemDescAmmoTypeProjectile',
+		'FGItemDescAmmoTypeColorCartridge',
+		'FGItemDescAmmoTypeInstantHit',
+		'FGAmmoTypeProjectile',
+		'FGAmmoTypeSpreadshot',
+		'FGAmmoTypeInstantHit',
+		'FGConsumableEquipment',
+		'FGEquipmentStunSpear',
+		'FGObjectScanner',
+		'FGWeapon',
+		'FGGasMask',
+		'FGSuitBase',
+		'FGJetPack',
+		'FGChargedWeapon',
+		'FGChainsaw',
+		'FGParachute',
+		'FGJumpingStilts',
+		'FGEquipmentZipline',
+		'FGHoverPack',
+		'FGPowerShardDescriptor',
+		'FGItemDescriptorPowerBoosterFuel',
+	].indexOf(nativeClass) !== -1 || nativeClass.indexOf('FGItemDescriptor') === 0;
+}
+
+function isBuildable(nativeClass: string): boolean
+{
+	return nativeClass.indexOf('FGBuildable') === 0 || [
+		'FGConveyorPoleStackable',
+		'FGPipeHyperStart',
+		'FGVehicleDescriptor',
+		'FGGolfCartDispenser',
+		'FGPortableMinerDispenser',
+		'FGVehiclePathSegment',
+	].indexOf(nativeClass) !== -1;
+}
+
+const docsPath = process.env.DOCS_PATH ? path.resolve(process.env.DOCS_PATH) : path.join(__dirname, '..', 'data', 'Docs.json');
+const oldDataPath = process.env.OLD_DATA_PATH ? path.resolve(process.env.OLD_DATA_PATH) : path.join(__dirname, '..', 'data', 'data.json');
+const outputDataPath = process.env.OUTPUT_DATA_PATH ? path.resolve(process.env.OUTPUT_DATA_PATH) : path.join(__dirname, '..', 'data', 'data.json');
+
+const docs = JSON.parse(readJsonText(docsPath));
+const oldData: IJsonSchema = JSON.parse(readJsonText(oldDataPath)) as IJsonSchema;
 //const sizes: {Name: string, Dimensions: number[]}[] = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'debug.json')).toString()) as {Name: string, Dimensions: number[]}[];
 
 const json: IJsonSchema = {
@@ -35,17 +102,19 @@ let extraInfo: any[] = [];
 let imageMapping: { [key: string]: string } = {};
 
 for (const definitions of docs) {
-	switch (definitions.NativeClass) {
-		case 'Class\'/Script/FactoryGame.FGItemDescriptor\'':
-		case 'Class\'/Script/FactoryGame.FGEquipmentDescriptor\'':
-		case 'Class\'/Script/FactoryGame.FGConsumableDescriptor\'':
-		case 'Class\'/Script/FactoryGame.FGItemDescriptorNuclearFuel\'':
-		case 'Class\'/Script/FactoryGame.FGItemDescAmmoTypeProjectile\'':
-		case 'Class\'/Script/FactoryGame.FGItemDescAmmoTypeColorCartridge\'':
-		case 'Class\'/Script/FactoryGame.FGItemDescAmmoTypeInstantHit\'':
-		case 'Class\'/Script/FactoryGame.FGAmmoTypeProjectile\'':
-		case 'Class\'/Script/FactoryGame.FGAmmoTypeSpreadshot\'':
-		case 'Class\'/Script/FactoryGame.FGAmmoTypeInstantHit\'':
+	const nativeClass = nativeClassName(definitions.NativeClass);
+
+	switch (nativeClass) {
+		case 'FGItemDescriptor':
+		case 'FGEquipmentDescriptor':
+		case 'FGConsumableDescriptor':
+		case 'FGItemDescriptorNuclearFuel':
+		case 'FGItemDescAmmoTypeProjectile':
+		case 'FGItemDescAmmoTypeColorCartridge':
+		case 'FGItemDescAmmoTypeInstantHit':
+		case 'FGAmmoTypeProjectile':
+		case 'FGAmmoTypeSpreadshot':
+		case 'FGAmmoTypeInstantHit':
 			for (const item of parseItemDescriptors(definitions.Classes)) {
 				json.items[item.className] = item;
 			}
@@ -53,12 +122,12 @@ for (const definitions of docs) {
 				imageMapping[item.className] = item.image;
 			}
 			break;
-		case 'Class\'/Script/FactoryGame.FGRecipe\'':
+		case 'FGRecipe':
 			for (const recipe of parseRecipes(definitions.Classes)) {
 				json.recipes[recipe.className] = recipe;
 			}
 			break;
-		case 'Class\'/Script/FactoryGame.FGResourceDescriptor\'':
+		case 'FGResourceDescriptor':
 			for (const item of parseItemDescriptors(definitions.Classes)) {
 				json.items[item.className] = item;
 			}
@@ -69,7 +138,7 @@ for (const definitions of docs) {
 				json.resources[resource.item] = resource;
 			}
 			break;
-		case 'Class\'/Script/FactoryGame.FGItemDescriptorBiomass\'':
+		case 'FGItemDescriptorBiomass':
 			biomass = parseItemDescriptors(definitions.Classes);
 			for (const item of biomass) {
 				json.items[item.className] = item;
@@ -78,75 +147,7 @@ for (const definitions of docs) {
 				imageMapping[item.className] = item.image;
 			}
 			break;
-		case 'Class\'/Script/FactoryGame.FGBuildablePole\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableConveyorBelt\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableWire\'':
-		case 'Class\'/Script/FactoryGame.FGBuildablePowerPole\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableDroneStation\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableTradingPost\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableSpaceElevator\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableManufacturer\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableStorage\'':
-		case 'Class\'/Script/FactoryGame.FGBuildable\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableWall\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableStair\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableConveyorLift\'':
-		case 'Class\'/Script/FactoryGame.FGBuildablePipelineSupport\'':
-		case 'Class\'/Script/FactoryGame.FGBuildablePipeline\'':
-		case 'Class\'/Script/FactoryGame.FGBuildablePipelineJunction\'':
-		case 'Class\'/Script/FactoryGame.FGBuildablePipelinePump\'':
-		case 'Class\'/Script/FactoryGame.FGBuildablePipeReservoir\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableWaterPump\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableFrackingExtractor\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableFrackingActivator\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableManufacturerVariablePower\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableTrainPlatformCargo\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableRailroadStation\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableRailroadTrack\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableFoundation\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableFactory\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableAttachmentMerger\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableAttachmentSplitter\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableResourceSink\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableResourceSinkShop\'':
-		case 'Class\'/Script/FactoryGame.FGConveyorPoleStackable\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableDockingStation\'':
-		case 'Class\'/Script/FactoryGame.FGPipeHyperStart\'':
-		case 'Class\'/Script/FactoryGame.FGBuildablePipeHyper\'':
-		case 'Class\'/Script/FactoryGame.FGBuildablePowerStorage\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableTrainPlatformEmpty\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableCircuitSwitch\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableSplitterSmart\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableWalkway\'':
-		case 'Class\'/Script/FactoryGame.FGVehicleDescriptor\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableLightSource\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableFloodlight\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableLightsControlPanel\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableDoor\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableCornerWall\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableMAM\'':
-		case 'Class\'/Script/FactoryGame.FGBuildablePillar\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableRamp\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableJumppad\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableRailroadSignal\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableBeam\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableFactoryBuilding\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableWidgetSign\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableLadder\'':
-		case 'Class\'/Script/FactoryGame.FGBuildablePassthrough\'':
-			for (const building of parseBuildings(definitions.Classes, true)) {
-				json.buildings[building.className] = building;
-			}
-			for (const item of parseImageMapping(definitions.Classes)) {
-				imageMapping[item.className] = item.image;
-			}
-			break;
-		case 'Class\'/Script/FactoryGame.FGBuildableRadarTower\'':
-			for (const building of parseBuildings(definitions.Classes, true)) {
-				json.buildings[building.className] = building;
-			}
-			break;
-		case 'Class\'/Script/FactoryGame.FGBuildableResourceExtractor\'':
+		case 'FGBuildableResourceExtractor':
 			for (const building of parseBuildings(definitions.Classes, true)) {
 				json.buildings[building.className] = building;
 			}
@@ -157,9 +158,9 @@ for (const definitions of docs) {
 				json.miners[miner.className] = miner;
 			}
 			break;
-		case 'Class\'/Script/FactoryGame.FGBuildableGeneratorFuel\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableGeneratorNuclear\'':
-		case 'Class\'/Script/FactoryGame.FGBuildableGeneratorGeoThermal\'':
+		case 'FGBuildableGeneratorFuel':
+		case 'FGBuildableGeneratorNuclear':
+		case 'FGBuildableGeneratorGeoThermal':
 			for (const building of parseBuildings(definitions.Classes, true)) {
 				json.buildings[building.className] = building;
 			}
@@ -170,13 +171,13 @@ for (const definitions of docs) {
 				json.generators[generator.className] = generator;
 			}
 			break;
-		case 'Class\'/Script/FactoryGame.FGBuildingDescriptor\'':
+		case 'FGBuildingDescriptor':
 			extraInfo = parseBuildingDescriptors(definitions.Classes);
 			for (const item of parseImageMapping(definitions.Classes)) {
 				imageMapping[item.className] = item.image;
 			}
 			break;
-		case 'Class\'/Script/FactoryGame.FGSchematic\'':
+		case 'FGSchematic':
 			for (const schematic of parseSchematics(definitions.Classes)) {
 				json.schematics[schematic.className] = schematic;
 			}
@@ -185,6 +186,24 @@ for (const definitions of docs) {
 			}
 			break;
 		default:
+			if (isItemDescriptor(nativeClass)) {
+				for (const item of parseItemDescriptors(definitions.Classes)) {
+					json.items[item.className] = item;
+				}
+				for (const item of parseImageMapping(definitions.Classes)) {
+					imageMapping[item.className] = item.image;
+				}
+				break;
+			}
+			if (isBuildable(nativeClass)) {
+				for (const building of parseBuildings(definitions.Classes, true)) {
+					json.buildings[building.className] = building;
+				}
+				for (const item of parseImageMapping(definitions.Classes)) {
+					imageMapping[item.className] = item.image;
+				}
+				break;
+			}
 			// console.log(definitions.NativeClass);
 			break;
 	}
@@ -233,9 +252,11 @@ const vehicleMapping: {
 ];
 
 for (const item of vehicleMapping) {
-	json.buildings[item.key].name = item.name;
-	json.buildings[item.key].description = item.description;
-	json.buildings[item.key].slug = Strings.webalize(item.name);
+	if (json.buildings[item.key]) {
+		json.buildings[item.key].name = item.name;
+		json.buildings[item.key].description = item.description;
+		json.buildings[item.key].slug = Strings.webalize(item.name);
+	}
 }
 
 // add building sizes
@@ -372,7 +393,7 @@ for (const key in json.schematics) {
 	slugs.push(slug);
 }
 
-fs.writeFileSync(path.join(__dirname, '..', 'data', 'data.json'), JSON.stringify(json, null, '\t') + '\n');
+fs.writeFileSync(outputDataPath, JSON.stringify(json, null, '\t') + '\n');
 
 const diffGenerator = new DiffGenerator();
 fs.writeFileSync(path.join(__dirname, '..', 'data', 'diff.txt'), DiffFormatter.diffToMarkdown(diffGenerator.generateDiff(oldData, json)));

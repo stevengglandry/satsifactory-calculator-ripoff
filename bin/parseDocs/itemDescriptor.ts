@@ -18,10 +18,15 @@ export default function parseItemDescriptors(items: {
 	mFluidFriction: string,
 	mFluidColor: string,
 	mPersistentBigIcon: string,
+	mSmallIcon?: string,
 }[])
 {
 	const result: IItemSchema[] = [];
 	for (const item of items) {
+		if (!item.mDisplayName) {
+			continue;
+		}
+
 		const ignored = [
 			'BP_EquipmentDescriptorCandyCane_C',
 			'BP_EquipmentDescriptorSnowballMittens_C',
@@ -51,18 +56,22 @@ export default function parseItemDescriptors(items: {
 			continue;
 		}
 
-		if (item.mPersistentBigIcon !== 'None') {
+		const icon = item.mPersistentBigIcon || item.mSmallIcon || 'None';
+		if (icon !== 'None') {
+			const liquid = item.mForm !== 'RF_SOLID';
+			const fluidMultiplier = liquid ? 1000 : 1;
+
 			result.push({
 				slug: Strings.webalize(item.mDisplayName),
 				className: item.ClassName,
 				name: item.mDisplayName,
-				sinkPoints: parseInt(item.mResourceSinkPoints),
-				description: item.mDescription.replace(/\r\n/ig, '\n'),
-				stackSize: Strings.stackSizeFromEnum(item.mStackSize),
-				energyValue: parseFloat(item.mEnergyValue),
-				radioactiveDecay: parseFloat(item.mRadioactiveDecay),
-				liquid: item.mForm !== 'RF_SOLID',
-				fluidColor: parseColor(Strings.unserializeDocs(item.mFluidColor)),
+				sinkPoints: parseInt(item.mResourceSinkPoints || '0') * fluidMultiplier,
+				description: (item.mDescription || '').replace(/\r\n/ig, '\n'),
+				stackSize: Strings.stackSizeFromEnum(item.mStackSize || 'SS_ONE'),
+				energyValue: parseFloat(item.mEnergyValue || '0') * fluidMultiplier,
+				radioactiveDecay: parseFloat(item.mRadioactiveDecay || '0'),
+				liquid: liquid,
+				fluidColor: parseColor(Strings.unserializeDocs(item.mFluidColor || '(B=0,G=0,R=0,A=0)')),
 			});
 		}
 	}
