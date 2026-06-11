@@ -64,6 +64,7 @@ export class ProductionTab
 			this.data.request.blockedMachines = [];
 		}
 		this.normalizeResourceNodes();
+		this.repairClearedResourceNodeLimits();
 
 		this.unregisterCallback = scope.$watch(() => {
 			return this.data.request;
@@ -677,6 +678,7 @@ export class ProductionTab
 		}
 
 		if (!hasValidNodes) {
+			this.setDefaultRawResources();
 			return;
 		}
 
@@ -704,6 +706,40 @@ export class ProductionTab
 	private normalizePurity(purity: string): RESOURCE_PURITY
 	{
 		return this.resourcePurities.indexOf(purity as RESOURCE_PURITY) !== -1 ? purity as RESOURCE_PURITY : 'pure';
+	}
+
+	private repairClearedResourceNodeLimits(): void
+	{
+		if (this.hasValidResourceNode()) {
+			return;
+		}
+
+		let nodeLimitedResourceCount = 0;
+		let zeroNodeLimitedResourceCount = 0;
+		for (const resource of Object.values(data.getRawData().resources)) {
+			if (!this.getAvailableMinersForResource(resource.item).length) {
+				continue;
+			}
+
+			nodeLimitedResourceCount++;
+			if ((this.data.request.resourceMax[resource.item] || 0) <= 0) {
+				zeroNodeLimitedResourceCount++;
+			}
+		}
+
+		if (nodeLimitedResourceCount > 0 && zeroNodeLimitedResourceCount > nodeLimitedResourceCount / 2) {
+			this.setDefaultRawResources();
+		}
+	}
+
+	private hasValidResourceNode(): boolean
+	{
+		for (const node of this.data.request.resourceNodes || []) {
+			if (node.item && this.getResourceNodeTotal(node) > 0) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private normalizeOverclock(overclock: number): number
