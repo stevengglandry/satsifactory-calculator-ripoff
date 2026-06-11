@@ -46,6 +46,12 @@ interface ISankeyEdge
 	targetY: number;
 }
 
+interface ISankeyPoint
+{
+	x: number;
+	y: number;
+}
+
 export class VisualizationComponentController implements IController
 {
 
@@ -57,6 +63,7 @@ export class VisualizationComponentController implements IController
 	private unregisterWatcherCallback: () => void;
 	private network: Network|undefined;
 	private fitted: boolean = false;
+	private sankeyDragCleanup: (() => void)|undefined;
 
 	public constructor(private readonly $element: any, private readonly $scope: IScope, private readonly $timeout: ITimeoutService) {}
 
@@ -283,25 +290,17 @@ export class VisualizationComponentController implements IController
 		const labels: string[] = [];
 
 		for (const edge of graph.edges) {
-			const sourceX = edge.from.x + edge.from.width;
-			const targetX = edge.to.x;
-			const controlDistance = Math.max(80, (targetX - sourceX) * 0.5);
-			const path = 'M ' + sourceX + ' ' + edge.sourceY +
-				' C ' + (sourceX + controlDistance) + ' ' + edge.sourceY +
-				', ' + (targetX - controlDistance) + ' ' + edge.targetY +
-				', ' + targetX + ' ' + edge.targetY;
 			const title = this.escapeSvg(edge.from.label + ' -> ' + edge.to.label + '\n' + edge.itemName + ': ' + Strings.formatNumber(edge.amount) + ' / min');
 			paths.push(
-				'<path class="sankey-link" d="' + path + '" stroke="' + edge.color + '" stroke-width="' + edge.width + '">' +
+				'<path class="sankey-link" data-edge-id="' + edge.id + '" d="' + this.getSankeyPath(edge) + '" stroke="' + edge.color + '" stroke-width="' + edge.width + '">' +
 					'<title>' + title + '</title>' +
 				'</path>'
 			);
 
 			if (edge.width >= 8) {
-				const labelX = (sourceX + targetX) / 2;
-				const labelY = (edge.sourceY + edge.targetY) / 2 - Math.max(8, edge.width / 2);
+				const label = this.getSankeyLabelPosition(edge);
 				labels.push(
-					'<text class="sankey-link-label" x="' + labelX + '" y="' + labelY + '">' +
+					'<text class="sankey-link-label" data-edge-id="' + edge.id + '" x="' + label.x + '" y="' + label.y + '">' +
 						this.escapeSvg(edge.itemName + ' ' + Strings.formatNumber(edge.amount) + '/min') +
 					'</text>'
 				);
@@ -312,7 +311,7 @@ export class VisualizationComponentController implements IController
 		for (const node of graph.nodes) {
 			const title = this.escapeSvg(node.label + '\nIn: ' + Strings.formatNumber(node.incoming) + ' / min\nOut: ' + Strings.formatNumber(node.outgoing) + ' / min');
 			nodeMarkup.push(
-				'<g class="sankey-node sankey-node-' + node.type + '">' +
+				'<g class="sankey-node sankey-node-' + node.type + '" data-node-id="' + node.id + '">' +
 					'<rect x="' + node.x + '" y="' + node.y + '" width="' + node.width + '" height="' + node.height + '" rx="4" ry="4" fill="' + node.color + '">' +
 						'<title>' + title + '</title>' +
 					'</rect>' +
@@ -331,6 +330,8 @@ export class VisualizationComponentController implements IController
 					'<g class="sankey-nodes">' + nodeMarkup.join('') + '</g>' +
 				'</svg>' +
 			'</div>';
+
+		this.bindSankeyDragging(graph.nodes, graph.edges, width, height);
 	}
 
 	private drawVisualisation(nodes: DataSet<IVisNode>, edges: DataSet<IVisEdge>): Network
@@ -384,6 +385,10 @@ export class VisualizationComponentController implements IController
 
 	private resetContainer(): void
 	{
+		if (this.sankeyDragCleanup) {
+			this.sankeyDragCleanup();
+			this.sankeyDragCleanup = undefined;
+		}
 		if (this.network) {
 			this.network.destroy();
 			this.network = undefined;
@@ -665,6 +670,198 @@ export class VisualizationComponentController implements IController
 			total += edge.width + gap;
 		}
 		return total;
+	}
+
+	private getSankeyPath(edge: ISankeyEdge): string
+	{
+		const sourceX = edge.from.x + edge.from.width;
+		const targetX = edge.to.x;
+		const controlDistance = Math.max(80, Math.abs(targetX - sourceX) * 0.5);
+		const direction = targetX >= sourceX ? 1 : -1;
+		return 'M ' + sourceX + ' ' + edge.sourceY +
+			' C ' + (sourceX + controlDistance * direction) + ' ' + edge.sourceY +
+			', ' + (targetX - controlDistance * direction) + ' ' + edge.targetY +
+			', ' + targetX + ' ' + edge.targetY;
+	}
+
+	private getSankeyLabelPosition(edge: ISankeyEdge): ISankeyPoint
+	{
+		const sourceX = edge.from.x + edge.from.width;
+		const targetX = edge.to.x;
+		return {
+			x: (sourceX + targetX) / 2,
+			y: (edge.sourceY + edge.targetY) / 2 - Math.max(8, edge.width / 2),
+		};
+	}
+
+	private bindSankeyDragging(nodes: ISankeyNode[], edges: ISankeyEdge[], width: number, height: number): void
+	{
+		if (this.sankeyDragCleanup) {
+			this.sankeyDragCleanup();
+			this.sankeyDragCleanup = undefined;
+		}
+
+		const svg = this.$element[0].querySelector('.visualization-sankey svg') as SVGSVGElement|null;
+		if (!svg) {
+			return;
+		}
+
+		const nodeById: {[key: number]: ISankeyNode} = {};
+		for (const node of nodes) {
+			nodeById[node.id] = node;
+		}
+
+		let activeNode: ISankeyNode|null = null;
+		let activeNodeElement: Element|null = null;
+		let startPointer: ISankeyPoint = {x: 0, y: 0};
+		let startNodeX = 0;
+		let startNodeY = 0;
+		let moveHandler: (event: Event) => void;
+		let endHandler: () => void;
+
+		const getPoint = (event: MouseEvent|TouchEvent): ISankeyPoint => {
+			let clientX = 0;
+			let clientY = 0;
+			const touchEvent = event as TouchEvent;
+			if (touchEvent.touches && touchEvent.touches.length) {
+				clientX = touchEvent.touches[0].clientX;
+				clientY = touchEvent.touches[0].clientY;
+			} else if (touchEvent.changedTouches && touchEvent.changedTouches.length) {
+				clientX = touchEvent.changedTouches[0].clientX;
+				clientY = touchEvent.changedTouches[0].clientY;
+			} else {
+				const mouseEvent = event as MouseEvent;
+				clientX = mouseEvent.clientX;
+				clientY = mouseEvent.clientY;
+			}
+
+			const rect = svg.getBoundingClientRect();
+			const viewBox = svg.viewBox.baseVal;
+			const scaleX = rect.width ? viewBox.width / rect.width : 1;
+			const scaleY = rect.height ? viewBox.height / rect.height : 1;
+			return {
+				x: viewBox.x + (clientX - rect.left) * scaleX,
+				y: viewBox.y + (clientY - rect.top) * scaleY,
+			};
+		};
+
+		const removeDocumentListeners = () => {
+			document.removeEventListener('mousemove', moveHandler);
+			document.removeEventListener('mouseup', endHandler);
+			document.removeEventListener('touchmove', moveHandler);
+			document.removeEventListener('touchend', endHandler);
+			document.removeEventListener('touchcancel', endHandler);
+		};
+
+		const startHandler = (event: Event) => {
+			const nodeElement = event.currentTarget as Element;
+			const nodeId = parseInt(nodeElement.getAttribute('data-node-id') || '', 10);
+			const node = nodeById[nodeId];
+			if (!node) {
+				return;
+			}
+
+			if (event.cancelable) {
+				event.preventDefault();
+			}
+
+			activeNode = node;
+			activeNodeElement = nodeElement;
+			startPointer = getPoint(event as MouseEvent|TouchEvent);
+			startNodeX = node.x;
+			startNodeY = node.y;
+			nodeElement.classList.add('dragging');
+			svg.classList.add('sankey-dragging');
+
+			removeDocumentListeners();
+			document.addEventListener('mousemove', moveHandler);
+			document.addEventListener('mouseup', endHandler);
+			document.addEventListener('touchmove', moveHandler, {passive: false});
+			document.addEventListener('touchend', endHandler);
+			document.addEventListener('touchcancel', endHandler);
+		};
+
+		moveHandler = (event: Event) => {
+			if (!activeNode) {
+				return;
+			}
+
+			if (event.cancelable) {
+				event.preventDefault();
+			}
+
+			const pointer = getPoint(event as MouseEvent|TouchEvent);
+			activeNode.x = Math.max(0, Math.min(width - activeNode.width, startNodeX + pointer.x - startPointer.x));
+			activeNode.y = Math.max(0, Math.min(height - activeNode.height, startNodeY + pointer.y - startPointer.y));
+			this.positionSankeyLinks(nodes, edges);
+			this.updateSankeyNode(activeNode, svg);
+			this.updateSankeyEdges(edges, svg);
+		};
+
+		endHandler = () => {
+			if (activeNodeElement) {
+				activeNodeElement.classList.remove('dragging');
+			}
+			svg.classList.remove('sankey-dragging');
+			activeNode = null;
+			activeNodeElement = null;
+			removeDocumentListeners();
+		};
+
+		const nodeElements = Array.from(svg.querySelectorAll('.sankey-node'));
+		for (const nodeElement of nodeElements) {
+			nodeElement.addEventListener('mousedown', startHandler);
+			nodeElement.addEventListener('touchstart', startHandler, {passive: false});
+		}
+
+		this.sankeyDragCleanup = () => {
+			removeDocumentListeners();
+			for (const nodeElement of nodeElements) {
+				nodeElement.removeEventListener('mousedown', startHandler);
+				nodeElement.removeEventListener('touchstart', startHandler);
+			}
+		};
+	}
+
+	private updateSankeyNode(node: ISankeyNode, svg: SVGSVGElement): void
+	{
+		const nodeElement = svg.querySelector('.sankey-node[data-node-id="' + node.id + '"]');
+		if (!nodeElement) {
+			return;
+		}
+
+		const rect = nodeElement.querySelector('rect');
+		if (rect) {
+			rect.setAttribute('x', node.x + '');
+			rect.setAttribute('y', node.y + '');
+		}
+
+		const text = nodeElement.querySelector('text');
+		if (text) {
+			text.setAttribute('x', (node.x + 10) + '');
+			text.setAttribute('y', (node.y + 18) + '');
+			const tspans = Array.from(text.querySelectorAll('tspan'));
+			for (const tspan of tspans) {
+				tspan.setAttribute('x', (node.x + 10) + '');
+			}
+		}
+	}
+
+	private updateSankeyEdges(edges: ISankeyEdge[], svg: SVGSVGElement): void
+	{
+		for (const edge of edges) {
+			const path = svg.querySelector('path.sankey-link[data-edge-id="' + edge.id + '"]');
+			if (path) {
+				path.setAttribute('d', this.getSankeyPath(edge));
+			}
+
+			const label = svg.querySelector('text.sankey-link-label[data-edge-id="' + edge.id + '"]');
+			if (label) {
+				const position = this.getSankeyLabelPosition(edge);
+				label.setAttribute('x', position.x + '');
+				label.setAttribute('y', position.y + '');
+			}
+		}
 	}
 
 	private getNodeLabelMarkup(node: ISankeyNode): string
