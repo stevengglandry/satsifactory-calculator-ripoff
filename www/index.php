@@ -18,18 +18,18 @@
 	<meta name="title" content="Satisfactory Tools" />
 	<meta name="type" content="website" />
 	<meta name="image" content="https://www.satisfactorytools.com/assets/images/icons/android-chrome-512x512.png" />
-	<meta name="description" content="A collection of powerful tools for planning and building the perfect base. Calculate your production or consumption, browse items, buildings, and schematics and share your builds with others!" />
+	<meta name="description" content="A collection of powerful tools for planning and building the perfect base. Calculate your production or consumption, browse items, buildings, and schematics and share your builds with others! lolfuckyoujacob" />
 	<!-- Open Graph / Facebook -->
 	<meta property="og:type" content="website">
 	<meta property="og:url" content="https://www.satisfactorytools.com/">
 	<meta property="og:title" content="Satisfactory Tools">
-	<meta property="og:description" content="A collection of powerful tools for planning and building the perfect base. Calculate your production or consumption, browse items, buildings, and schematics and share your builds with others!">
+	<meta property="og:description" content="A collection of powerful tools for planning and building the perfect base. Calculate your production or consumption, browse items, buildings, and schematics and share your builds with others! lolfuckyoujacob">
 	<meta property="og:image" content="https://www.satisfactorytools.com/assets/images/icons/android-chrome-512x512.png">
 	<!-- Twitter -->
 	<meta property="twitter:card" content="summary">
 	<meta property="twitter:url" content="https://www.satisfactorytools.com/">
 	<meta property="twitter:title" content="Satisfactory Tools">
-	<meta property="twitter:description" content="A collection of powerful tools for planning and building the perfect base. Calculate your production or consumption, browse items, buildings, and schematics and share your builds with others!">
+	<meta property="twitter:description" content="A collection of powerful tools for planning and building the perfect base. Calculate your production or consumption, browse items, buildings, and schematics and share your builds with others! lolfuckyoujacob">
 	<meta property="twitter:image" content="https://www.satisfactorytools.com/assets/images/icons/android-chrome-512x512.png">
 
 	<style>
