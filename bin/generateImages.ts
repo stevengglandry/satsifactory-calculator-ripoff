@@ -34,17 +34,17 @@ if (!fs.existsSync(mappingPath)) {
 
 	for (const itemClass in data.items) {
 		if (itemClass in mapping) {
-			processImage(mapping[itemClass], data.items[itemClass].slug);
+			processImage(mapping[itemClass], data.items[itemClass].icon || data.items[itemClass].slug);
 		}
 	}
 	for (const buildingClass in data.buildings) {
 		if (buildingClass in mapping) {
-			processImage(mapping[buildingClass], data.buildings[buildingClass].slug);
+			processImage(mapping[buildingClass], data.buildings[buildingClass].icon || data.buildings[buildingClass].slug);
 		}
 	}
 	for (const schematicClass in data.schematics) {
 		if (schematicClass in mapping) {
-			processImage(mapping[schematicClass], data.schematics[schematicClass].slug);
+			processImage(mapping[schematicClass], data.schematics[schematicClass].icon || data.schematics[schematicClass].slug);
 		}
 	}
 }

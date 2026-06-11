@@ -101,6 +101,28 @@ let biomass: IItemSchema[] = [];
 let extraInfo: any[] = [];
 let imageMapping: { [key: string]: string } = {};
 
+type IconSection = 'items' | 'buildings' | 'schematics';
+type IconEntity = {
+	className: string,
+	icon?: string,
+};
+
+function getClassIcon(className: string): string
+{
+	return className.toLowerCase().replace(/_/g, '-');
+}
+
+function attachIconMetadata(section: IconSection): void
+{
+	const entries = json[section] as {[key: string]: IconEntity};
+	const previousEntries = oldData[section] as {[key: string]: {icon?: string}|undefined};
+
+	for (const key in entries) {
+		const previousIcon = previousEntries[key]?.icon;
+		entries[key].icon = previousIcon || getClassIcon(entries[key].className);
+	}
+}
+
 for (const definitions of docs) {
 	const nativeClass = nativeClassName(definitions.NativeClass);
 
@@ -392,6 +414,10 @@ for (const key in json.schematics) {
 	json.schematics[key].slug = slug;
 	slugs.push(slug);
 }
+
+attachIconMetadata('items');
+attachIconMetadata('buildings');
+attachIconMetadata('schematics');
 
 fs.writeFileSync(outputDataPath, JSON.stringify(json, null, '\t') + '\n');
 
