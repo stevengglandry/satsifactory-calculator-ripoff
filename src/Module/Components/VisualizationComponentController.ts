@@ -24,6 +24,7 @@ interface ISankeyNode
 	color: string;
 	level: number;
 	value: number;
+	valueLabel: string;
 	incoming: number;
 	outgoing: number;
 	x: number;
@@ -445,6 +446,9 @@ export class VisualizationComponentController implements IController
 
 		for (const node of nodes) {
 			node.value = Math.max(node.incoming, node.outgoing, 1);
+			if (!node.valueLabel) {
+				node.valueLabel = Strings.formatNumber(node.value) + ' / min';
+			}
 		}
 
 		this.assignSankeyLevels(nodes, edges);
@@ -459,9 +463,11 @@ export class VisualizationComponentController implements IController
 		let type = 'recipe';
 		let color = '#df691a';
 		let label = this.plainText(node.getTitle());
+		let valueLabel = '';
 
 		if (node instanceof RecipeNode) {
 			label = node.recipeData.recipe.name;
+			valueLabel = Strings.formatNumber(node.recipeData.amount) + 'x ' + node.recipeData.machine.name;
 		} else if (node instanceof MinerNode) {
 			type = 'resource';
 			color = '#4e5d6c';
@@ -491,6 +497,7 @@ export class VisualizationComponentController implements IController
 			color: color,
 			level: 0,
 			value: 0,
+			valueLabel: valueLabel,
 			incoming: 0,
 			outgoing: 0,
 			x: 0,
@@ -951,9 +958,8 @@ export class VisualizationComponentController implements IController
 	{
 		const labelPosition = this.getSankeyNodeLabelPosition(node);
 		const label = this.escapeSvg(this.truncateSankeyLabel(node.label));
-		const amount = Strings.formatNumber(node.value) + ' / min';
 		return '<tspan x="' + labelPosition.x + '" dy="0">' + label + '</tspan>' +
-			'<tspan class="sankey-node-value" x="' + labelPosition.x + '" dy="17">' + this.escapeSvg(amount) + '</tspan>';
+			'<tspan class="sankey-node-value" x="' + labelPosition.x + '" dy="17">' + this.escapeSvg(node.valueLabel) + '</tspan>';
 	}
 
 	private truncateSankeyLabel(label: string): string
