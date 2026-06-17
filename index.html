@@ -40,6 +40,10 @@
 						return part.replace(/~and~/g, '&');
 					})
 					.join('?');
+				var basePath = location.pathname.replace(/\/$/, '');
+				if (basePath && decoded.charAt(0) === '/' && decoded.indexOf(basePath + '/') !== 0) {
+					decoded = basePath + decoded;
+				}
 				window.history.replaceState(null, '', decoded + location.hash);
 			}
 		})(window.location);
