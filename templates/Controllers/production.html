@@ -958,10 +958,10 @@
 		<div ng-show="ctrl.tab.resultTab === 'visualization'">
 			<div class="visualization-toolbar border-left border-right border-secondary p-2">
 				<span ng-if="ctrl.tab.state.visualizationMode === 'diagram'">
-					You can move the nodes around using drag'n'drop.
+					You can move the nodes around using drag'n'drop. Right-click and drag to pan the viewer.
 				</span>
 				<span ng-if="ctrl.tab.state.visualizationMode === 'sankey'">
-					You can move the nodes around using drag'n'drop. Connector width is proportional to the item amount moving between producers and consumers.
+					You can move the nodes around using drag'n'drop. Right-click and drag to pan the viewer. Connector width is proportional to the item amount moving between producers and consumers.
 				</span>
 				<span class="btn-group btn-group-sm">
 					<span ng-class="{btn: true, 'btn-success': ctrl.tab.state.visualizationMode === 'diagram', 'btn-secondary': ctrl.tab.state.visualizationMode !== 'diagram'}" ng-click="ctrl.tab.state.visualizationMode = 'diagram'">

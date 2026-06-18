@@ -1,0 +1,77 @@
+import {IWorldResourceNode} from '@src/AgentPlanner/Types';
+
+// Starter global catalog. The planner and map are intentionally isolated from the
+// source so a full SCIM/community-resource export can replace or extend this list.
+export const WORLD_RESOURCE_NODES: IWorldResourceNode[] = [
+	{id: 'nf-iron-01', item: 'Desc_OreIron_C', purity: 'pure', region: 'Northern Forest', location: {x: 60593, y: -77891, z: 12200}},
+	{id: 'nf-iron-02', item: 'Desc_OreIron_C', purity: 'normal', region: 'Northern Forest', location: {x: 54600, y: -83200, z: 11900}},
+	{id: 'nf-copper-01', item: 'Desc_OreCopper_C', purity: 'normal', region: 'Northern Forest', location: {x: 70200, y: -80200, z: 12100}},
+	{id: 'nf-limestone-01', item: 'Desc_Stone_C', purity: 'pure', region: 'Northern Forest', location: {x: 61600, y: -69400, z: 11700}},
+	{id: 'nf-coal-01', item: 'Desc_Coal_C', purity: 'normal', region: 'Northern Forest', location: {x: 84300, y: -65400, z: 10500}},
+	{id: 'nf-caterium-01', item: 'Desc_OreGold_C', purity: 'normal', region: 'Northern Forest', location: {x: 92300, y: -91200, z: 14100}},
+	{id: 'nf-quartz-01', item: 'Desc_RawQuartz_C', purity: 'normal', region: 'Northern Forest', location: {x: 33400, y: -100200, z: 15100}},
+	{id: 'nf-sam-01', item: 'Desc_SAM_C', purity: 'normal', region: 'Northern Forest', location: {x: 23800, y: -86200, z: 16400}},
+
+	{id: 'rd-iron-01', item: 'Desc_OreIron_C', purity: 'pure', region: 'Rocky Desert', location: {x: -146200, y: -132400, z: 9800}},
+	{id: 'rd-iron-02', item: 'Desc_OreIron_C', purity: 'normal', region: 'Rocky Desert', location: {x: -137800, y: -126100, z: 9400}},
+	{id: 'rd-copper-01', item: 'Desc_OreCopper_C', purity: 'pure', region: 'Rocky Desert', location: {x: -128700, y: -142900, z: 9700}},
+	{id: 'rd-limestone-01', item: 'Desc_Stone_C', purity: 'pure', region: 'Rocky Desert', location: {x: -118600, y: -118500, z: 9300}},
+	{id: 'rd-coal-01', item: 'Desc_Coal_C', purity: 'pure', region: 'Rocky Desert', location: {x: -168400, y: -95000, z: 8200}},
+	{id: 'rd-sulfur-01', item: 'Desc_Sulfur_C', purity: 'normal', region: 'Rocky Desert', location: {x: -178000, y: -109400, z: 7600}},
+	{id: 'rd-caterium-01', item: 'Desc_OreGold_C', purity: 'normal', region: 'Rocky Desert', location: {x: -106200, y: -156300, z: 11200}},
+	{id: 'rd-oil-01', item: 'Desc_LiquidOil_C', purity: 'normal', region: 'Rocky Desert Coast', location: {x: -216300, y: -161200, z: -500}},
+
+	{id: 'dd-iron-01', item: 'Desc_OreIron_C', purity: 'pure', region: 'Dune Desert', location: {x: 248500, y: -176100, z: 6500}},
+	{id: 'dd-iron-02', item: 'Desc_OreIron_C', purity: 'normal', region: 'Dune Desert', location: {x: 236600, y: -162500, z: 6400}},
+	{id: 'dd-copper-01', item: 'Desc_OreCopper_C', purity: 'pure', region: 'Dune Desert', location: {x: 223400, y: -144200, z: 6200}},
+	{id: 'dd-limestone-01', item: 'Desc_Stone_C', purity: 'pure', region: 'Dune Desert', location: {x: 266300, y: -150900, z: 6100}},
+	{id: 'dd-coal-01', item: 'Desc_Coal_C', purity: 'normal', region: 'Dune Desert', location: {x: 188300, y: -106500, z: 7700}},
+	{id: 'dd-sulfur-01', item: 'Desc_Sulfur_C', purity: 'pure', region: 'Dune Desert', location: {x: 180600, y: -83700, z: 9500}},
+	{id: 'dd-quartz-01', item: 'Desc_RawQuartz_C', purity: 'pure', region: 'Dune Desert', location: {x: 202500, y: -199600, z: 8300}},
+	{id: 'dd-caterium-01', item: 'Desc_OreGold_C', purity: 'pure', region: 'Dune Desert', location: {x: 273600, y: -102100, z: 7200}},
+	{id: 'dd-sam-01', item: 'Desc_SAM_C', purity: 'normal', region: 'Dune Desert', location: {x: 228300, y: -68500, z: 8600}},
+
+	{id: 'gc-iron-01', item: 'Desc_OreIron_C', purity: 'normal', region: 'Grass Fields', location: {x: -76800, y: 232000, z: 8200}},
+	{id: 'gc-iron-02', item: 'Desc_OreIron_C', purity: 'pure', region: 'Grass Fields', location: {x: -43000, y: 221000, z: 7300}},
+	{id: 'gc-copper-01', item: 'Desc_OreCopper_C', purity: 'normal', region: 'Grass Fields', location: {x: -58300, y: 242600, z: 7600}},
+	{id: 'gc-limestone-01', item: 'Desc_Stone_C', purity: 'normal', region: 'Grass Fields', location: {x: -65400, y: 255300, z: 7800}},
+	{id: 'gc-coal-01', item: 'Desc_Coal_C', purity: 'normal', region: 'Grass Fields Crater', location: {x: -9600, y: 168500, z: 6500}},
+	{id: 'gc-sulfur-01', item: 'Desc_Sulfur_C', purity: 'normal', region: 'Grass Fields Crater', location: {x: -28200, y: 146700, z: 7400}},
+
+	{id: 'bc-oil-01', item: 'Desc_LiquidOil_C', purity: 'pure', region: 'Blue Crater', location: {x: 158200, y: 218400, z: -3500}},
+	{id: 'bc-oil-02', item: 'Desc_LiquidOil_C', purity: 'normal', region: 'Blue Crater', location: {x: 173400, y: 206100, z: -4200}},
+	{id: 'bc-coal-01', item: 'Desc_Coal_C', purity: 'pure', region: 'Blue Crater', location: {x: 126700, y: 186400, z: 4200}},
+	{id: 'bc-sulfur-01', item: 'Desc_Sulfur_C', purity: 'pure', region: 'Blue Crater', location: {x: 108900, y: 206800, z: 5100}},
+	{id: 'bc-iron-01', item: 'Desc_OreIron_C', purity: 'normal', region: 'Blue Crater', location: {x: 134900, y: 242200, z: 3900}},
+	{id: 'bc-copper-01', item: 'Desc_OreCopper_C', purity: 'normal', region: 'Blue Crater', location: {x: 117600, y: 231200, z: 5200}},
+	{id: 'bc-nitrogen-01', item: 'Desc_NitrogenGas_C', purity: 'normal', region: 'Blue Crater', location: {x: 189500, y: 246300, z: 1100}},
+
+	{id: 'sw-bauxite-01', item: 'Desc_OreBauxite_C', purity: 'pure', region: 'Swamp', location: {x: 224200, y: 91500, z: 9800}},
+	{id: 'sw-bauxite-02', item: 'Desc_OreBauxite_C', purity: 'normal', region: 'Swamp', location: {x: 236400, y: 110400, z: 9300}},
+	{id: 'sw-copper-01', item: 'Desc_OreCopper_C', purity: 'normal', region: 'Swamp', location: {x: 205300, y: 79000, z: 7600}},
+	{id: 'sw-coal-01', item: 'Desc_Coal_C', purity: 'normal', region: 'Swamp', location: {x: 187700, y: 103300, z: 7200}},
+	{id: 'sw-quartz-01', item: 'Desc_RawQuartz_C', purity: 'normal', region: 'Swamp', location: {x: 249700, y: 68500, z: 11900}},
+	{id: 'sw-sulfur-01', item: 'Desc_Sulfur_C', purity: 'normal', region: 'Swamp', location: {x: 268600, y: 115600, z: 7400}},
+	{id: 'sw-uranium-01', item: 'Desc_OreUranium_C', purity: 'normal', region: 'Swamp', location: {x: 283100, y: 143800, z: 5400}},
+	{id: 'sw-sam-01', item: 'Desc_SAM_C', purity: 'pure', region: 'Swamp', location: {x: 221700, y: 135400, z: 6500}},
+
+	{id: 'rf-bauxite-01', item: 'Desc_OreBauxite_C', purity: 'pure', region: 'Red Forest', location: {x: -19600, y: 11300, z: 25200}},
+	{id: 'rf-quartz-01', item: 'Desc_RawQuartz_C', purity: 'pure', region: 'Red Forest', location: {x: -34800, y: 26600, z: 24100}},
+	{id: 'rf-caterium-01', item: 'Desc_OreGold_C', purity: 'pure', region: 'Red Forest', location: {x: 1200, y: 38400, z: 22900}},
+	{id: 'rf-uranium-01', item: 'Desc_OreUranium_C', purity: 'pure', region: 'Red Forest', location: {x: -46600, y: 51200, z: 21600}},
+	{id: 'rf-sam-01', item: 'Desc_SAM_C', purity: 'pure', region: 'Red Forest', location: {x: -11700, y: 59600, z: 23700}},
+	{id: 'rf-coal-01', item: 'Desc_Coal_C', purity: 'normal', region: 'Red Forest', location: {x: 28400, y: 27800, z: 20100}},
+	{id: 'rf-sulfur-01', item: 'Desc_Sulfur_C', purity: 'pure', region: 'Red Forest', location: {x: -63600, y: 17800, z: 20200}},
+
+	{id: 'sp-oil-01', item: 'Desc_LiquidOil_C', purity: 'pure', region: 'Spire Coast', location: {x: -278000, y: -23000, z: -3800}},
+	{id: 'sp-oil-02', item: 'Desc_LiquidOil_C', purity: 'normal', region: 'Spire Coast', location: {x: -260300, y: -38500, z: -3600}},
+	{id: 'sp-iron-01', item: 'Desc_OreIron_C', purity: 'normal', region: 'Spire Coast', location: {x: -224400, y: -48600, z: 5800}},
+	{id: 'sp-copper-01', item: 'Desc_OreCopper_C', purity: 'normal', region: 'Spire Coast', location: {x: -213600, y: -28800, z: 6700}},
+	{id: 'sp-caterium-01', item: 'Desc_OreGold_C', purity: 'normal', region: 'Spire Coast', location: {x: -244500, y: -68500, z: 7600}},
+
+	{id: 'tp-oil-01', item: 'Desc_LiquidOil_C', purity: 'pure', region: 'Western Beaches', location: {x: -257300, y: 142200, z: -4200}},
+	{id: 'tp-oil-02', item: 'Desc_LiquidOil_C', purity: 'pure', region: 'Western Beaches', location: {x: -241400, y: 157800, z: -3900}},
+	{id: 'tp-copper-01', item: 'Desc_OreCopper_C', purity: 'pure', region: 'Western Beaches', location: {x: -196600, y: 167200, z: 6500}},
+	{id: 'tp-iron-01', item: 'Desc_OreIron_C', purity: 'normal', region: 'Western Beaches', location: {x: -182800, y: 149100, z: 7200}},
+	{id: 'tp-limestone-01', item: 'Desc_Stone_C', purity: 'normal', region: 'Western Beaches', location: {x: -173100, y: 181400, z: 6800}},
+];

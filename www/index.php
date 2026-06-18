@@ -31,6 +31,23 @@
 	<meta property="twitter:title" content="Satisfactory Tools">
 	<meta property="twitter:description" content="A collection of powerful tools for planning and building the perfect base. Calculate your production or consumption, browse items, buildings, and schematics and share your builds with others! lolfuckyoujacob">
 	<meta property="twitter:image" content="https://www.satisfactorytools.com/assets/images/icons/android-chrome-512x512.png">
+	<script>
+		(function(location) {
+			if (location.search.length > 1 && location.search.charAt(1) === '/') {
+				var decoded = location.search.slice(1)
+					.split('&')
+					.map(function(part) {
+						return part.replace(/~and~/g, '&');
+					})
+					.join('?');
+				var basePath = location.pathname.replace(/\/$/, '');
+				if (basePath && decoded.charAt(0) === '/' && decoded.indexOf(basePath + '/') !== 0) {
+					decoded = basePath + decoded;
+				}
+				window.history.replaceState(null, '', decoded + location.hash);
+			}
+		})(window.location);
+	</script>
 
 	<style>
 		[ng\:cloak], [ng-cloak], [data-ng-cloak], [x-ng-cloak], .ng-cloak, .x-ng-cloak {

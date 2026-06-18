@@ -6,7 +6,9 @@ import {ItemController} from '@src/Module/Controllers/ItemController';
 import {ItemIconDirective} from '@src/Module/Directives/ItemIconDirective';
 import {RecentlyVisitedItemsService} from '@src/Module/Services/RecentlyVisitedItemsService';
 import {ProductionController} from '@src/Module/Controllers/ProductionController';
+import {AgentPlannerController} from '@src/Module/Controllers/AgentPlannerController';
 import {VisualizationComponent} from '@src/Module/Components/VisualizationComponent';
+import {PlannerMapComponent} from '@src/Module/Components/PlannerMapComponent';
 import {ItemFilterComponent} from '@src/Module/Components/ItemFilterComponent';
 import {ItemFiltersService} from '@src/Module/Services/ItemFiltersService';
 import {ApplicationBreadcrumbsComponent} from '@src/Module/Components/ApplicationBreadcrumbsComponent';
@@ -332,6 +334,22 @@ export class AppModule
 						},
 					},
 				},
+				{
+					name: 'agentPlanner',
+					url: '/agent-planner',
+					parent: 'listing',
+					ncyBreadcrumb: {
+						label: 'Planner',
+						parent: 'home',
+					},
+					views: {
+						'content@listing': {
+							controller: 'AgentPlannerController',
+							controllerAs: 'ctrl',
+							template: require('@templates/Controllers/agentPlanner.html'),
+						},
+					},
+				},
 			];
 			appStates.forEach((state) => {
 				$stateProvider.state(state);
@@ -447,6 +465,7 @@ export class AppModule
 		});
 
 		this.app.component('visualization', new VisualizationComponent);
+		this.app.component('plannerMap', new PlannerMapComponent);
 		this.app.component('itemFilter', new ItemFilterComponent);
 		this.app.component('buildingFilter', new BuildingFilterComponent);
 		this.app.component('schematicFilter', new SchematicFilterComponent);
@@ -475,6 +494,7 @@ export class AppModule
 		this.app.controller('BuildingController', BuildingController);
 		this.app.controller('SchematicController', SchematicController);
 		this.app.controller('ProductionController', ProductionController);
+		this.app.controller('AgentPlannerController', AgentPlannerController);
 	}
 
 	private static generateNumberFormattingFunction()

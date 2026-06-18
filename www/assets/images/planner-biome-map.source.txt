@@ -1,0 +1,3 @@
+Source: https://satisfactory.wiki.gg/images/3/31/Biome_Map.jpg?5a7a1a
+Reference page: https://satisfactory.wiki.gg/wiki/World
+Used by the agent planner resource map as a local raster background.

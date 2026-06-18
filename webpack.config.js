@@ -21,6 +21,9 @@ module.exports = {
 		}),
 	],
 	resolve: {
+		alias: {
+			'stream/web': require.resolve('web-streams-polyfill'),
+		},
 		plugins: [
 			new TsconfigPathsPlugin,
 		],
@@ -48,6 +51,10 @@ module.exports = {
 			{
 				test: /\.css$/i,
 				use: ['style-loader', 'css-loader'],
+			},
+			{
+				test: /\.(png|jpg|gif)$/i,
+				type: 'asset/inline',
 			},
 			{
 				test: /\.scss$/,

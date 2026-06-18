@@ -71,6 +71,7 @@ export class VisualizationComponentController implements IController
 	private network: Network|undefined;
 	private fitted: boolean = false;
 	private sankeyDragCleanup: (() => void)|undefined;
+	private panCleanup: (() => void)|undefined;
 
 	public constructor(private readonly $element: any, private readonly $scope: IScope, private readonly $timeout: ITimeoutService) {}
 
@@ -88,6 +89,7 @@ export class VisualizationComponentController implements IController
 	public $onDestroy(): void
 	{
 		this.unregisterWatcherCallback();
+		this.resetContainer();
 	}
 
 	public useCytoscape(result: ProductionResult): void
@@ -199,6 +201,18 @@ export class VisualizationComponentController implements IController
 
 		this.network = this.drawVisualisation(nodes, edges);
 		const network = this.network;
+		this.bindRightButtonPanning(this.$element[0] as HTMLElement, (deltaX, deltaY) => {
+			const position = network.getViewPosition();
+			const scale = network.getScale();
+			network.moveTo({
+				position: {
+					x: position.x - deltaX / scale,
+					y: position.y - deltaY / scale,
+				},
+				scale: scale,
+				animation: false,
+			});
+		});
 
 		this.$timeout(0).then(() => {
 			const elkGraph: IElkGraph = {
@@ -342,6 +356,13 @@ export class VisualizationComponentController implements IController
 			'</div>';
 
 		this.bindSankeyDragging(graph.nodes, graph.edges, layout.width, layout.height);
+		const viewport = this.$element[0].querySelector('.visualization-sankey') as HTMLElement|null;
+		if (viewport) {
+			this.bindRightButtonPanning(viewport, (deltaX, deltaY) => {
+				viewport.scrollLeft -= deltaX;
+				viewport.scrollTop -= deltaY;
+			});
+		}
 	}
 
 	private drawVisualisation(nodes: DataSet<IVisNode>, edges: DataSet<IVisEdge>): Network
@@ -395,6 +416,10 @@ export class VisualizationComponentController implements IController
 
 	private resetContainer(): void
 	{
+		if (this.panCleanup) {
+			this.panCleanup();
+			this.panCleanup = undefined;
+		}
 		if (this.sankeyDragCleanup) {
 			this.sankeyDragCleanup();
 			this.sankeyDragCleanup = undefined;
@@ -404,6 +429,82 @@ export class VisualizationComponentController implements IController
 			this.network = undefined;
 		}
 		this.$element[0].innerHTML = '';
+	}
+
+	private bindRightButtonPanning(target: HTMLElement, pan: (deltaX: number, deltaY: number) => void): void
+	{
+		if (this.panCleanup) {
+			this.panCleanup();
+			this.panCleanup = undefined;
+		}
+
+		let activePointerId: number|null = null;
+		let lastX = 0;
+		let lastY = 0;
+
+		const finishPanning = (event?: PointerEvent) => {
+			if (activePointerId === null || (event && event.pointerId !== activePointerId)) {
+				return;
+			}
+
+			if (target.hasPointerCapture && target.hasPointerCapture(activePointerId)) {
+				target.releasePointerCapture(activePointerId);
+			}
+			activePointerId = null;
+			target.classList.remove('visualization-right-panning');
+		};
+
+		const pointerDownHandler = (event: PointerEvent) => {
+			if (event.button !== 2) {
+				return;
+			}
+
+			activePointerId = event.pointerId;
+			lastX = event.clientX;
+			lastY = event.clientY;
+			target.classList.add('visualization-right-panning');
+			target.setPointerCapture(event.pointerId);
+			event.preventDefault();
+			event.stopPropagation();
+		};
+
+		const pointerMoveHandler = (event: PointerEvent) => {
+			if (event.pointerId !== activePointerId) {
+				return;
+			}
+
+			if ((event.buttons & 2) === 0) {
+				finishPanning(event);
+				return;
+			}
+
+			const deltaX = event.clientX - lastX;
+			const deltaY = event.clientY - lastY;
+			lastX = event.clientX;
+			lastY = event.clientY;
+			pan(deltaX, deltaY);
+			event.preventDefault();
+			event.stopPropagation();
+		};
+
+		const contextMenuHandler = (event: MouseEvent) => {
+			event.preventDefault();
+		};
+
+		target.addEventListener('pointerdown', pointerDownHandler, true);
+		window.addEventListener('pointermove', pointerMoveHandler, true);
+		window.addEventListener('pointerup', finishPanning, true);
+		window.addEventListener('pointercancel', finishPanning, true);
+		target.addEventListener('contextmenu', contextMenuHandler);
+
+		this.panCleanup = () => {
+			finishPanning();
+			target.removeEventListener('pointerdown', pointerDownHandler, true);
+			window.removeEventListener('pointermove', pointerMoveHandler, true);
+			window.removeEventListener('pointerup', finishPanning, true);
+			window.removeEventListener('pointercancel', finishPanning, true);
+			target.removeEventListener('contextmenu', contextMenuHandler);
+		};
 	}
 
 	private buildSankeyGraph(result: ProductionResult): {nodes: ISankeyNode[], edges: ISankeyEdge[]}
@@ -834,6 +935,11 @@ export class VisualizationComponentController implements IController
 		};
 
 		const startHandler = (event: Event) => {
+			const mouseEvent = event as MouseEvent;
+			if (typeof mouseEvent.button === 'number' && mouseEvent.button !== 0) {
+				return;
+			}
+
 			const nodeElement = event.currentTarget as Element;
 			const nodeId = parseInt(nodeElement.getAttribute('data-node-id') || '', 10);
 			const node = nodeById[nodeId];
