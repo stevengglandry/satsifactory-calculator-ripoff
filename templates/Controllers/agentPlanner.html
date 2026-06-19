@@ -1,168 +1,110 @@
 <h2 class="sr-only">Planner</h2>
 
-<div class="agent-planner" ng-if="ctrl.session">
-	<div class="planner-context-bar">
-		<div class="planner-context-stats">
-			<span class="planner-context-save" tooltip title="{{ctrl.session.saveName}}">
-				<span class="fas fa-fw fa-save"></span>
-				{{ctrl.session.saveName}}
-			</span>
-			<span>
-				<span class="fas fa-fw fa-layer-group"></span>
-				Phase {{ctrl.session.state.projectAssembly.currentPhase}}
-				<small>{{ctrl.session.state.projectAssembly.phaseSource}}</small>
-			</span>
-			<span><span class="fas fa-fw fa-industry"></span>{{ctrl.formatNumber(ctrl.session.state.buildingCount)}} buildings</span>
-			<span><span class="fas fa-fw fa-map-pin"></span>{{ctrl.session.state.tappedNodes.length}} tapped nodes</span>
-			<span ng-if="ctrl.isApproximateMap()" class="planner-map-warning"><span class="fas fa-fw fa-exclamation-triangle"></span>Approximate map</span>
+<div class="agent-planner planner-command-center" ng-if="ctrl.session">
+	<header class="planner-context-bar">
+		<div class="planner-save-context">
+			<label>Save</label>
+			<select class="form-control form-control-sm planner-session-select" ng-model="ctrl.session" ng-options="session as session.saveName for session in ctrl.sessions track by session.id" ng-change="ctrl.selectSession(ctrl.session)" aria-label="Planner session"></select>
+			<span><i class="fas fa-layer-group"></i> Active phase {{ctrl.session.state.projectAssembly.currentPhase}}</span>
+			<span><i class="fas fa-industry"></i> {{ctrl.formatNumber(ctrl.session.state.buildingCount)}} buildings</span>
+			<span><i class="fas fa-map-pin"></i> {{ctrl.session.state.tappedNodes.length}} tapped nodes</span>
 		</div>
 		<div class="planner-context-actions">
-			<select class="form-control form-control-sm planner-session-select" ng-model="ctrl.session" ng-options="session as session.saveName for session in ctrl.sessions track by session.id" ng-change="ctrl.selectSession(ctrl.session)" aria-label="Planner session"></select>
+			<button type="button" class="planner-policy-toggle" ng-click="ctrl.toggleRecipePolicy('allowLockedRecipePreview')" ng-class="{'is-active': ctrl.session.recipePolicy.allowLockedRecipePreview}">Preview locked recipes</button>
+			<button type="button" class="planner-policy-toggle" ng-click="ctrl.toggleRecipePolicy('allowSamResourceConversion')" ng-class="{'is-active': ctrl.session.recipePolicy.allowSamResourceConversion}" title="SAM raw-resource conversion recipes are off by default">SAM conversion {{ctrl.session.recipePolicy.allowSamResourceConversion ? 'on' : 'off'}}</button>
 			<label class="btn btn-sm btn-outline-light planner-import-button" ng-class="{disabled: ctrl.loading}">
-				<span ng-class="{'fas': true, 'fa-fw': true, 'fa-file-import': !ctrl.loading, 'fa-spin': ctrl.loading, 'fa-sync-alt': ctrl.loading}"></span>
-				{{ctrl.loading ? ctrl.status : 'Import new save'}}
+				<i class="fas" ng-class="{'fa-file-import': !ctrl.loading, 'fa-spin fa-sync-alt': ctrl.loading}"></i>
+				{{ctrl.loading ? ctrl.status : 'Import save'}}
 				<input type="file" id="plannerSaveFile" accept=".sav" ng-disabled="ctrl.loading">
 			</label>
 		</div>
-	</div>
+	</header>
 
 	<div class="alert alert-danger planner-alert" ng-if="ctrl.error">{{ctrl.error}}</div>
 
-	<div class="planner-dashboard-grid">
-		<aside class="planner-rail planner-goals-rail">
-			<h3><span class="far fa-fw fa-dot-circle"></span>Next goals</h3>
-			<button type="button" class="planner-goal-row" ng-repeat="option in ctrl.session.options track by option.id" ng-if="option.strategy !== 'planD'" ng-click="ctrl.selectOption(option)" ng-class="{'is-selected': ctrl.selectedOption.id === option.id}">
-				<span class="planner-goal-number">{{$index + 1}}</span>
-				<span class="planner-goal-main">
-					<span class="planner-goal-title">
-						<item-icon item="option.targetItems[0]" size="38" hide-tooltip="true"></item-icon>
-						<strong>{{option.targetDisplay}}</strong>
-						<span class="fas fa-fw" ng-class="{'fa-check-square': ctrl.selectedOption.id === option.id, 'fa-square': ctrl.selectedOption.id !== option.id}"></span>
-					</span>
-					<span class="planner-goal-metric"><span>Target rate</span><strong>{{ctrl.formatNumber(option.recommendedRate)}} / min</strong></span>
-					<span class="planner-goal-metric"><span>Potential output</span><strong>{{ctrl.formatNumber(ctrl.getPotentialRate(option))}} / min</strong></span>
-					<span class="planner-goal-metric"><span>Remaining</span><strong>{{ctrl.formatNumber(ctrl.getGoalRemaining(option))}}</strong></span>
-					<span class="planner-goal-metric"><span>Finish in</span><strong>{{ctrl.getEstimatedCompletion(option)}}</strong></span>
+	<div class="planner-command-grid">
+		<aside class="planner-command-panel planner-goals-panel">
+			<div class="planner-panel-heading"><h3>Goals</h3><span>5 / 5</span></div>
+			<div role="button" tabindex="0" class="planner-command-goal" ng-repeat="option in ctrl.session.options | limitTo: 3 track by option.id" ng-click="ctrl.selectOption(option)" ng-keydown="$event.key === 'Enter' && ctrl.selectOption(option)" ng-class="{'is-selected': ctrl.selectedOption.id === option.id}">
+				<span class="planner-goal-index">{{$index + 1}}</span>
+				<span class="planner-command-goal-body">
+					<small>{{ctrl.getGoalKind(option)}}</small>
+					<span class="planner-goal-name"><item-icon item="option.targetItems[0]" size="32" hide-tooltip="true"></item-icon><strong>{{option.targetDisplay}}</strong></span>
+					<span class="planner-goal-numbers"><span>Current <b>{{ctrl.formatNumber(ctrl.getPotentialRate(option))}}/min</b></span><span class="planner-goal-rate-stepper">Additional <button type="button" ng-click="ctrl.adjustOptionRate(option, -1, $event)">−</button><b>{{ctrl.formatNumber(option.recommendedRate)}}</b><button type="button" ng-click="ctrl.adjustOptionRate(option, 1, $event)">+</button>/min</span></span>
+					<span class="planner-goal-reason">{{option.targetReason}}</span>
 				</span>
-			</button>
+			</div>
 
-			<details class="planner-custom-goal">
-				<summary><span class="fas fa-fw fa-sliders-h"></span>Custom goal</summary>
-				<label>
-					<span>Item</span>
-					<select class="form-control form-control-sm" ng-model="ctrl.customTargetItem" ng-options="target.item as target.name for target in ctrl.customTargetOptions"></select>
-				</label>
-				<label>
-					<span>Rate / min</span>
-					<input type="number" min="0.1" step="0.1" class="form-control form-control-sm" ng-model="ctrl.customTargetRate">
-				</label>
-				<button type="button" class="btn btn-sm btn-warning btn-block" ng-click="ctrl.generateCustomPlan()">Generate custom plan</button>
-			</details>
+			<div class="planner-custom-slot" ng-repeat="slot in ctrl.customGoals track by slot.strategy" ng-class="{'is-selected': slot.option && ctrl.selectedOption.id === slot.option.id}">
+				<div class="planner-custom-slot-title"><span class="planner-goal-index">{{$index + 4}}</span><strong>Custom goal {{$index + 1}}</strong></div>
+				<select class="form-control form-control-sm" ng-model="slot.item" ng-options="target.item as target.name for target in ctrl.customTargetOptions"></select>
+				<div class="planner-rate-editor">
+					<button type="button" ng-click="ctrl.adjustCustomRate(slot, -1)">−</button>
+					<input type="number" min="0.1" step="0.1" ng-model="slot.rate" aria-label="Custom target rate">
+					<button type="button" ng-click="ctrl.adjustCustomRate(slot, 1)">+</button>
+					<span>/ min</span>
+				</div>
+				<button type="button" class="planner-custom-build" ng-click="ctrl.generateCustomPlan(slot)">{{slot.option ? 'Update plan' : 'Build plan'}}</button>
+			</div>
 		</aside>
 
-		<main class="planner-map-workspace">
-			<div class="planner-section-heading">
-				<h3><span class="far fa-fw fa-compass"></span>Best location for {{ctrl.selectedOption.targetDisplay}}</h3>
+		<main class="planner-command-panel planner-map-workspace">
+			<div class="planner-panel-heading">
+				<h3>Map · {{ctrl.selectedOption.targetDisplay}}</h3>
+				<button type="button" ng-click="ctrl.fitMapSelection()"><i class="fas fa-crosshairs"></i> Fit selection</button>
 			</div>
 			<div class="planner-map-toolbar">
-				<div class="planner-filter-group">
-					<button type="button" class="planner-tool-button" ng-click="ctrl.resourceFilterOpen = !ctrl.resourceFilterOpen" ng-class="{'is-active': ctrl.resourceFilterOpen}"><span class="fas fa-fw fa-layer-group"></span>Resources</button>
-					<div class="planner-resource-popover" ng-if="ctrl.resourceFilterOpen">
-						<button type="button" ng-repeat="item in ctrl.selectedOption.applicableResources" ng-click="ctrl.toggleResource(item)" ng-class="{'is-off': ctrl.mapFilters.resources[item] === false}">
-							<item-icon item="item" size="20" hide-tooltip="true"></item-icon>{{ctrl.getItemName(item)}}
-						</button>
-					</div>
-				</div>
-				<div class="planner-purity-tools" aria-label="Purity filters">
-					<span>Purity</span>
+				<button type="button" ng-click="ctrl.resourceFilterOpen = !ctrl.resourceFilterOpen" ng-class="{'is-active': ctrl.resourceFilterOpen}"><i class="fas fa-gem"></i> Resources</button>
+				<button type="button" ng-click="ctrl.toggleMapFilter('showFactories')" ng-class="{'is-active': ctrl.mapFilters.showFactories}"><i class="fas fa-industry"></i> Factories</button>
+				<button type="button" ng-click="ctrl.toggleMapFilter('showRail')" ng-class="{'is-active': ctrl.mapFilters.showRail}"><i class="fas fa-train"></i> Rail</button>
+				<button type="button" ng-click="ctrl.toggleMapFilter('showTrucks')" ng-class="{'is-active': ctrl.mapFilters.showTrucks}"><i class="fas fa-truck"></i> Trucks</button>
+				<button type="button" ng-click="ctrl.toggleMapFilter('showDrones')" ng-class="{'is-active': ctrl.mapFilters.showDrones}"><i class="fas fa-helicopter"></i> Drones</button>
+				<button type="button" ng-click="ctrl.toggleMapFilter('showHypertubes')" ng-class="{'is-active': ctrl.mapFilters.showHypertubes}"><i class="fas fa-circle-notch"></i> Hypertubes</button>
+				<button type="button" ng-click="ctrl.toggleMapFilter('untappedOnly')" ng-class="{'is-active': ctrl.mapFilters.untappedOnly}">Untapped only</button>
+				<span class="planner-purity-tools">Purity
 					<button type="button" ng-click="ctrl.togglePurity('impure')" ng-class="{'is-off': !ctrl.mapFilters.purities.impure}">I</button>
 					<button type="button" ng-click="ctrl.togglePurity('normal')" ng-class="{'is-off': !ctrl.mapFilters.purities.normal}">N</button>
 					<button type="button" ng-click="ctrl.togglePurity('pure')" ng-class="{'is-off': !ctrl.mapFilters.purities.pure}">P</button>
-				</div>
-				<button type="button" class="planner-tool-button" ng-click="ctrl.toggleMapFilter('untappedOnly')" ng-class="{'is-active': ctrl.mapFilters.untappedOnly}"><span class="fas fa-fw fa-map-marker-alt"></span>Untapped only</button>
-				<button type="button" class="planner-tool-button" ng-click="ctrl.toggleMapFilter('showFactories')" ng-class="{'is-active': ctrl.mapFilters.showFactories}"><span class="fas fa-fw fa-industry"></span>Factories</button>
-				<button type="button" class="planner-tool-button" ng-click="ctrl.toggleMapFilter('showRoutes')" ng-class="{'is-active': ctrl.mapFilters.showRoutes}"><span class="fas fa-fw fa-route"></span>Routes</button>
-				<button type="button" class="planner-tool-button planner-fit-button" ng-click="ctrl.fitMapSelection()"><span class="fas fa-fw fa-crosshairs"></span>Fit selection</button>
+				</span>
 			</div>
-
+			<div class="planner-resource-popover" ng-if="ctrl.resourceFilterOpen">
+				<button type="button" ng-repeat="item in ctrl.selectedOption.applicableResources" ng-click="ctrl.toggleResource(item)" ng-class="{'is-off': ctrl.mapFilters.resources[item] === false}"><item-icon item="item" size="20" hide-tooltip="true"></item-icon>{{ctrl.getItemName(item)}}</button>
+			</div>
 			<div class="planner-map-frame">
 				<planner-map map-data="ctrl.mapOption.map" image-url="ctrl.worldMapImage" factory-areas="ctrl.session.state.occupiedFactoryAreas" routes="ctrl.session.state.transportRoutes" filters="ctrl.mapFilters" on-candidate-select="ctrl.selectCandidate(candidateId)"></planner-map>
-				<div class="planner-map-legend">
-					<span><i class="planner-legend-dot is-selected"></i>Selected nodes</span>
-					<span><i class="planner-legend-dot is-applicable"></i>Other applicable nodes</span>
-					<span><i class="planner-legend-dot is-tapped"></i>Tapped nodes</span>
-					<span><i class="planner-legend-factory"></i>Existing factories</span>
-					<span><i class="planner-legend-candidate">A</i>Alternate candidates</span>
-				</div>
+				<div class="planner-map-legend"><span><i class="planner-legend-dot is-selected"></i>Selected</span><span><i class="planner-legend-dot is-applicable"></i>Untapped</span><span><i class="planner-legend-dot is-tapped"></i>Tapped</span><span><i class="planner-legend-factory"></i>Factories</span></div>
+			</div>
+			<div class="planner-candidate-bar">
+				<span>Location candidates</span>
+				<button type="button" ng-repeat="candidate in ctrl.selectedOption.candidateClusters track by candidate.id" ng-click="ctrl.selectCandidate(candidate.id)" ng-class="{'is-selected': candidate.id === ctrl.selectedOption.cluster.id}">{{ctrl.getCandidateLabel(candidate)}} · {{candidate.name}} · {{ctrl.getCandidateScore(candidate)}}</button>
 			</div>
 		</main>
 
-		<aside class="planner-rail planner-insights-rail">
-			<section class="planner-insight-section planner-phase-section">
-				<h3><span class="fas fa-fw fa-rocket"></span>Phase {{ctrl.session.state.projectAssembly.currentPhase}} progress</h3>
-				<div class="planner-phase-timeline">
-					<span ng-repeat="phase in ctrl.phaseSteps" ng-class="{'is-complete': phase < ctrl.session.state.projectAssembly.currentPhase, 'is-current': phase === ctrl.session.state.projectAssembly.currentPhase}"><i></i>{{phase}}</span>
-				</div>
-				<p class="planner-confidence-note">Available inventory toward this phase; delivered totals are not exposed by the save.</p>
-				<div class="planner-phase-part" ng-repeat="part in ctrl.getCurrentPhaseParts() track by part.item">
-					<div>
-						<item-icon item="part.item" size="28" hide-tooltip="true"></item-icon>
-						<span>{{part.name}}</span>
-						<strong>{{ctrl.formatNumber(ctrl.getPartProgress(part))}}%</strong>
-					</div>
-					<div class="planner-progress-track"><i ng-style="{width: ctrl.getPartProgress(part) + '%'}"></i></div>
-				</div>
-			</section>
-
-			<section class="planner-insight-section planner-production-section">
-				<div class="planner-insight-title-row">
-					<h3>Production vs target</h3>
-					<label>
-						<span>Finish in</span>
-						<select class="form-control form-control-sm" ng-model="ctrl.planningHorizonHours" ng-options="hours as (hours + ' hours') for hours in ctrl.horizonOptions" ng-change="ctrl.updatePlanningHorizon()"></select>
-					</label>
-				</div>
-				<div class="planner-rate-legend"><span><i class="is-current"></i>Potential output</span><span><i class="is-target"></i>Target rate</span></div>
-				<div class="planner-rate-row" ng-repeat="option in ctrl.session.options | limitTo: 3 track by option.id" ng-class="ctrl.getRateStatus(option)">
-					<div class="planner-rate-title">
-						<item-icon item="option.targetItems[0]" size="28" hide-tooltip="true"></item-icon>
-						<span>{{option.targetDisplay}}</span>
-					</div>
-					<div class="planner-rate-values"><span>{{ctrl.formatNumber(ctrl.getPotentialRate(option))}} / min</span><strong>{{ctrl.formatNumber(option.recommendedRate)}} / min</strong></div>
-					<div class="planner-rate-track"><i ng-style="{width: ctrl.getRateBarWidth(option) + '%'}"></i><b></b></div>
-				</div>
-			</section>
-
-			<section class="planner-insight-section planner-location-section">
-				<h3>Recommended location</h3>
-				<div class="planner-location-title">
-					<strong>{{ctrl.selectedOption.cluster.name}}</strong>
-					<span>Score {{ctrl.getCandidateScore(ctrl.selectedOption.cluster)}} / 100</span>
-				</div>
-				<div class="planner-candidate-switcher">
-					<button type="button" ng-repeat="candidate in ctrl.selectedOption.candidateClusters track by candidate.id" ng-click="ctrl.selectCandidate(candidate.id)" ng-class="{'is-selected': candidate.id === ctrl.selectedOption.cluster.id}">{{ctrl.getCandidateLabel(candidate)}} · {{ctrl.getCandidateScore(candidate)}}</button>
-				</div>
-				<div class="planner-score-row"><span>Resource coverage</span><div><i ng-style="{width: ctrl.getScorePercent(ctrl.selectedOption.scoreDetails.coverage) + '%'}"></i></div><strong>{{ctrl.getScorePercent(ctrl.selectedOption.scoreDetails.coverage)}}</strong></div>
-				<div class="planner-score-row"><span>Throughput potential</span><div><i ng-style="{width: ctrl.getScorePercent(ctrl.selectedOption.scoreDetails.throughput) + '%'}"></i></div><strong>{{ctrl.getScorePercent(ctrl.selectedOption.scoreDetails.throughput)}}</strong></div>
-				<div class="planner-score-row"><span>Logistics &amp; access</span><div><i ng-style="{width: ctrl.getScorePercent(ctrl.selectedOption.scoreDetails.logistics) + '%'}"></i></div><strong>{{ctrl.getScorePercent(ctrl.selectedOption.scoreDetails.logistics)}}</strong></div>
-				<div class="planner-score-row"><span>Expansion room</span><div><i ng-style="{width: ctrl.getScorePercent(ctrl.selectedOption.scoreDetails.occupiedArea) + '%'}"></i></div><strong>{{ctrl.getScorePercent(ctrl.selectedOption.scoreDetails.occupiedArea)}}</strong></div>
-				<p class="planner-location-reason">{{ctrl.selectedOption.cluster.nodes.length}} selected nodes cover {{ctrl.selectedOption.applicableResources.length}} raw resource types near existing logistics.</p>
-				<div class="planner-secondary-actions">
-					<button type="button" ng-click="ctrl.exportRequest(ctrl.selectedOption)" tooltip title="Export production request"><span class="fas fa-fw fa-file-code"></span></button>
-					<button type="button" ng-click="ctrl.exportMarkdown(ctrl.selectedOption)" tooltip title="Export plan markdown"><span class="fas fa-fw fa-file-alt"></span></button>
-				</div>
-			</section>
+		<aside class="planner-command-panel planner-runway-panel">
+			<div class="planner-panel-heading"><h3>Endgame runway</h3><i class="fas fa-chart-line"></i></div>
+			<label class="planner-horizon-control">Finish in
+				<select class="form-control form-control-sm" ng-model="ctrl.planningHorizonHours" ng-options="hours as hours for hours in ctrl.horizonOptions" ng-change="ctrl.updatePlanningHorizon()"></select>
+				hours
+			</label>
+			<div class="planner-runway-header"><span>Part</span><span>Current</span><span>Ideal</span></div>
+			<div class="planner-runway-row" ng-repeat="part in ctrl.getEndgameParts() track by part.item" ng-class="ctrl.getCapacityStatus(part)">
+				<span class="planner-runway-part"><item-icon item="part.item" size="26" hide-tooltip="true"></item-icon><span>{{part.name}}<small>{{ctrl.getPartEstimate(part)}} · {{ctrl.formatNumber(part.absoluteRemaining)}} remaining</small></span></span>
+				<strong>{{ctrl.formatNumber(part.currentRate)}}</strong>
+				<strong>{{ctrl.formatNumber(part.idealRate)}}</strong>
+				<div class="planner-capacity-track"><i ng-style="{width: ctrl.getCapacityBarWidth(part) + '%'}"></i></div>
+			</div>
 		</aside>
 	</div>
 
-	<div class="planner-action-strip">
-		<h3><span class="far fa-fw fa-check-circle"></span>Next 3 actions</h3>
-		<div class="planner-action-item" ng-repeat="action in ctrl.getPlannerActions() track by $index">
-			<span class="planner-action-number">{{$index + 1}}</span>
-			<span class="fas fa-fw {{action.icon}}"></span>
-			<span><strong>{{action.title}}</strong><small>{{action.detail}}</small></span>
+	<section class="planner-selected-strip">
+		<div class="planner-selected-title"><small>Selected goal plan</small><h3>{{ctrl.selectedOption.targetDisplay}}</h3><span>{{ctrl.getGoalKind(ctrl.selectedOption)}} · {{ctrl.selectedOption.cluster.name}}</span></div>
+		<div class="planner-selected-metric"><small>Additional rate</small><strong>+{{ctrl.formatNumber(ctrl.selectedOption.recommendedRate)}}<em>/min</em></strong><span>Current {{ctrl.formatNumber(ctrl.getPotentialRate(ctrl.selectedOption))}}/min</span></div>
+		<div class="planner-selected-metric"><small>Machines</small><strong>{{ctrl.formatNumber(ctrl.selectedOption.machineCount)}}</strong><span>{{ctrl.selectedOption.selectedResourceNodes.length}} resource nodes</span></div>
+		<div class="planner-selected-metric"><small>Power</small><strong>{{ctrl.formatNumber(ctrl.selectedOption.powerMw)}}<em>MW</em></strong><span>{{ctrl.selectedOption.warnings.length ? ctrl.selectedOption.warnings[0] : 'Feasible with selected resources'}}</span></div>
+		<div class="planner-action-list"><span ng-repeat="action in ctrl.getPlannerActions() track by $index"><i class="fas {{action.icon}}"></i><b>{{action.title}}</b><small>{{action.detail}}</small></span></div>
+		<div class="planner-selected-actions">
+			<button type="button" class="btn btn-warning" ng-click="ctrl.openAsCalculatorTab(ctrl.selectedOption)"><i class="fas fa-calculator"></i> Open in Calculator</button>
+			<button type="button" class="btn btn-outline-light" ng-click="ctrl.markSelected(ctrl.selectedOption)"><i class="fas fa-thumbtack"></i> {{ctrl.isSelected(ctrl.selectedOption) ? 'Plan pinned' : 'Pin plan'}}</button>
 		</div>
-		<button type="button" class="btn btn-warning planner-open-button" ng-click="ctrl.openAsCalculatorTab(ctrl.selectedOption)"><span class="fas fa-fw fa-calculator"></span>Open in Calculator</button>
-		<button type="button" class="btn btn-outline-light planner-pin-button" ng-click="ctrl.markSelected(ctrl.selectedOption)"><span class="fas fa-fw fa-thumbtack"></span>{{ctrl.isSelected(ctrl.selectedOption) ? 'Plan pinned' : 'Pin this plan'}}</button>
-	</div>
+	</section>
 </div>

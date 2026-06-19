@@ -262,6 +262,19 @@ export class ProductionController
 			save.push(tab.data);
 		}
 		this.dataStorageService.saveData(this.storageKey, save);
+		const linkedStorageKey = 'plannerLinkedPlans-' + this.$rootScope.version;
+		const links = this.dataStorageService.loadData(linkedStorageKey, {}) as {[planId: string]: {request: any, revision: number}};
+		for (const item of save) {
+			const link = item.metadata.plannerLink;
+			if (!link) {
+				continue;
+			}
+			links[link.plannerPlanId] = {
+				request: angular.copy(item.request),
+				revision: (links[link.plannerPlanId]?.revision || link.revision || 0) + 1,
+			};
+		}
+		this.dataStorageService.saveData(linkedStorageKey, links);
 	}
 
 	private loadState(): void

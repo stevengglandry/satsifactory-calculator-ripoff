@@ -9,6 +9,10 @@ interface IPlannerMapFilters
 	untappedOnly: boolean;
 	showFactories: boolean;
 	showRoutes: boolean;
+	showRail: boolean;
+	showTrucks: boolean;
+	showDrones: boolean;
+	showHypertubes: boolean;
 	fitRequest: number;
 }
 
@@ -181,14 +185,62 @@ export class PlannerMapComponentController implements IComponentController
 			}
 		}
 		if (this.filters.showRoutes) {
+			if (this.filters.showRail) this.renderRouteSegments('trainTrack', '#d5dde3', 18000, '4 4');
+			if (this.filters.showTrucks) this.renderRouteSegments('truckPath', '#f09a3e', 26000, '6 5');
+			if (this.filters.showHypertubes) this.renderRouteSegments('hypertube', '#9b72df', 18000, '3 5');
+			if (this.filters.showDrones) this.renderRouteSegments('dronePort', '#49cde5', 120000, '2 8');
 			for (const route of this.routes || []) {
+				if ((route.type === 'trainStation' || route.type === 'trainTrack') && !this.filters.showRail
+					|| (route.type === 'truckStop' || route.type === 'truckPath') && !this.filters.showTrucks
+					|| route.type === 'dronePort' && !this.filters.showDrones
+					|| route.type === 'hypertube' && !this.filters.showHypertubes) {
+					continue;
+				}
+				const color = route.type === 'trainStation' || route.type === 'trainTrack' ? '#d5dde3'
+					: route.type === 'truckStop' || route.type === 'truckPath' ? '#f09a3e'
+						: route.type === 'dronePort' ? '#49cde5' : '#9b72df';
 				L.circleMarker(this.toLatLng(route.location), {
-					radius: route.type === 'trainStation' || route.type === 'truckStop' ? 4 : 2,
-					color: '#71c79d',
+					radius: route.type === 'trainStation' || route.type === 'truckStop' || route.type === 'dronePort' ? 4 : 2,
+					color: color,
 					weight: 1,
-					fillColor: '#71c79d',
+					fillColor: color,
 					fillOpacity: 0.8,
-				}).bindTooltip(route.type).addTo(this.contextLayer);
+				}).bindTooltip(route.name + ' · ' + route.type).addTo(this.contextLayer);
+			}
+		}
+	}
+
+	private renderRouteSegments(type: ITransportRoutePoint['type'], color: string, maxDistance: number, dashArray: string): void
+	{
+		const points = (this.routes || []).filter((route) => route.type === type);
+		const connected = new Set<string>();
+		for (const point of points) {
+			let nearest: ITransportRoutePoint|null = null;
+			let nearestDistance = maxDistance;
+			for (const candidate of points) {
+				if (candidate.id === point.id) {
+					continue;
+				}
+				const key = [point.id, candidate.id].sort().join('|');
+				if (connected.has(key)) {
+					continue;
+				}
+				const dx = point.location.x - candidate.location.x;
+				const dy = point.location.y - candidate.location.y;
+				const distance = Math.sqrt(dx * dx + dy * dy);
+				if (distance < nearestDistance) {
+					nearest = candidate;
+					nearestDistance = distance;
+				}
+			}
+			if (nearest) {
+				connected.add([point.id, nearest.id].sort().join('|'));
+				L.polyline([this.toLatLng(point.location), this.toLatLng(nearest.location)], {
+					color: color,
+					weight: type === 'dronePort' ? 1 : 2,
+					dashArray: dashArray,
+					opacity: 0.7,
+				}).addTo(this.contextLayer);
 			}
 		}
 	}

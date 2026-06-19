@@ -13,6 +13,12 @@ export interface IProductionDataMetadata
 	icon: string|null;
 	schemaVersion: number;
 	gameVersion: string;
+	plannerLink?: {
+		plannerPlanId: string;
+		saveSnapshotId: string;
+		goalSlotId: string;
+		revision: number;
+	};
 
 }
 

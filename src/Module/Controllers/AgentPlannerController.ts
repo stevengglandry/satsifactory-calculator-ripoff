@@ -10,6 +10,7 @@ import {IRootScope} from '@src/Types/IRootScope';
 import {Strings} from '@src/Utils/Strings';
 import {IProductionData} from '@src/Tools/Production/IProductionData';
 import {AppPath} from '@src/Utils/AppPath';
+import {getDefaultBlockedRecipes, isSamResourceConversion} from '@src/AgentPlanner/RecipePolicy';
 
 interface IPlannerTargetOption
 {
@@ -22,6 +23,14 @@ interface IPlannerAction
 	icon: string;
 	title: string;
 	detail: string;
+}
+
+interface ICustomGoalSlot
+{
+	strategy: 'planD'|'planE';
+	item: string;
+	rate: number;
+	option: IFactoryPlanOption|null;
 }
 
 export class AgentPlannerController
@@ -38,9 +47,10 @@ export class AgentPlannerController
 	public customTargetItem = '';
 	public customTargetRate = 5;
 	public customTargetOptions: IPlannerTargetOption[] = [];
-	public readonly horizonOptions = [5, 10, 20, 40];
+	public readonly horizonOptions = [10, 20, 40, 80];
 	public readonly phaseSteps = [1, 2, 3, 4, 5];
-	public planningHorizonHours = 10;
+	public planningHorizonHours = 40;
+	public customGoals: ICustomGoalSlot[] = [];
 	public resourceFilterOpen = false;
 	public mapFilters = {
 		purities: {impure: true, normal: true, pure: true} as {[key: string]: boolean},
@@ -48,9 +58,13 @@ export class AgentPlannerController
 		untappedOnly: false,
 		showFactories: true,
 		showRoutes: true,
+		showRail: true,
+		showTrucks: true,
+		showDrones: true,
+		showHypertubes: true,
 		fitRequest: 0,
 	};
-	public readonly worldMapImage = AppPath.asset('assets/images/planner-biome-map.jpg');
+	public readonly worldMapImage = AppPath.asset('assets/images/planner-biome-map.webp');
 
 	private readonly extractor = new SaveGameStateExtractor;
 	private readonly planner = new FactoryPlanner;
@@ -74,6 +88,10 @@ export class AgentPlannerController
 		this.storageKey = 'agentPlannerSessions-' + $rootScope.version;
 		this.customTargetOptions = this.createCustomTargetOptions();
 		this.customTargetItem = this.customTargetOptions[0]?.item || '';
+		this.customGoals = [
+			{strategy: 'planD', item: this.customTargetItem, rate: 5, option: null},
+			{strategy: 'planE', item: this.customTargetItem, rate: 5, option: null},
+		];
 		this.loadSessions();
 		this.$timeout(() => {
 			this.attachSaveInputChangeHandler();
@@ -103,7 +121,7 @@ export class AgentPlannerController
 		this.error = '';
 		this.status = 'Parsing save...';
 
-		this.extractor.extractFromFile(file, this.$rootScope.version).then((state) => {
+		this.parseSaveInWorker(file).then((state) => {
 			this.$timeout(0).then(() => {
 				this.status = 'Generating planner options...';
 				const session = this.planner.createSession(state, this.$rootScope.version, this.planningHorizonHours);
@@ -123,13 +141,46 @@ export class AgentPlannerController
 		});
 	}
 
+	private parseSaveInWorker(file: File): Promise<IAgentGameState>
+	{
+		if (typeof Worker === 'undefined') {
+			return Promise.reject(new Error('This browser does not support background save parsing.'));
+		}
+		return file.arrayBuffer().then((buffer) => new Promise<IAgentGameState>((resolve, reject) => {
+			const worker = new Worker(AppPath.asset('assets/planner-save-worker.js'));
+			worker.onmessage = (event) => {
+				worker.terminate();
+				if (event.data?.ok) {
+					resolve(event.data.state as IAgentGameState);
+				} else {
+					reject(new Error(event.data?.error || 'Save worker failed.'));
+				}
+			};
+			worker.onerror = (event) => {
+				worker.terminate();
+				reject(new Error(event.message || 'Save worker failed.'));
+			};
+			worker.postMessage({fileName: file.name, gameVersion: this.$rootScope.version, buffer: buffer}, [buffer]);
+		}));
+	}
+
 	public selectSession(session: IPlannerSession): void
 	{
+		this.applyLinkedCalculatorChanges(session);
 		this.session = session;
-		this.planningHorizonHours = session.planningHorizonHours || 10;
+		this.planningHorizonHours = session.planningHorizonHours || 40;
+		session.recipePolicy = session.recipePolicy || {allowLockedRecipePreview: false, allowSamResourceConversion: false};
 		this.customOption = session.options.find((option) => {
 			return option.strategy === 'planD';
 		}) || null;
+		for (const slot of this.customGoals) {
+			const option = session.options.find((candidate) => candidate.strategy === slot.strategy) || null;
+			slot.option = option;
+			if (option) {
+				slot.item = option.targetItems[0];
+				slot.rate = option.recommendedRate;
+			}
+		}
 		this.selectedOption = session.options.find((option) => option.id === session.selectedOptionId) || session.options[0] || null;
 		this.mapOption = this.selectedOption;
 		this.syncResourceFilters();
@@ -153,18 +204,17 @@ export class AgentPlannerController
 		if (!this.session) {
 			return;
 		}
-		const horizon = this.horizonOptions.indexOf(Number(this.planningHorizonHours)) !== -1 ? Number(this.planningHorizonHours) : 10;
+		const horizon = this.horizonOptions.indexOf(Number(this.planningHorizonHours)) !== -1 ? Number(this.planningHorizonHours) : 40;
 		this.planningHorizonHours = horizon;
 		const previousSession = this.session;
 		const selectedStrategy = this.selectedOption?.strategy || 'planA';
-		const customOption = previousSession.options.find((option) => option.strategy === 'planD') || null;
+		const customOptions = previousSession.options.filter((option) => option.strategy === 'planD' || option.strategy === 'planE');
 		const refreshed = this.planner.createSession(previousSession.state, this.$rootScope.version, horizon);
 		refreshed.id = previousSession.id;
 		refreshed.createdAt = previousSession.createdAt;
 		refreshed.notes = previousSession.notes;
-		if (customOption) {
-			refreshed.options.push(customOption);
-		}
+		refreshed.options.push(...customOptions);
+		refreshed.recipePolicy = previousSession.recipePolicy || refreshed.recipePolicy;
 		const selected = refreshed.options.find((option) => option.strategy === selectedStrategy) || refreshed.options[0];
 		refreshed.selectedOptionId = selected?.id || null;
 		const index = this.sessions.indexOf(previousSession);
@@ -189,6 +239,10 @@ export class AgentPlannerController
 		this.selectedOption = replacement;
 		this.mapOption = replacement;
 		this.customOption = replacement.strategy === 'planD' ? replacement : this.customOption;
+		const customSlot = this.customGoals.find((slot) => slot.strategy === replacement.strategy);
+		if (customSlot) {
+			customSlot.option = replacement;
+		}
 		this.syncResourceFilters();
 		this.saveSessions();
 	}
@@ -205,7 +259,7 @@ export class AgentPlannerController
 		this.touchMapFilters();
 	}
 
-	public toggleMapFilter(filter: 'untappedOnly'|'showFactories'|'showRoutes'): void
+	public toggleMapFilter(filter: 'untappedOnly'|'showFactories'|'showRoutes'|'showRail'|'showTrucks'|'showDrones'|'showHypertubes'): void
 	{
 		this.mapFilters[filter] = !this.mapFilters[filter];
 		this.touchMapFilters();
@@ -231,7 +285,19 @@ export class AgentPlannerController
 	{
 		const storageKey = this.getProductionStorageKey();
 		const tabs = this.dataStorageService.loadData(storageKey, []) as IProductionData[];
-		tabs.push(angular.copy(option.productionData) as IProductionData);
+		const productionData = angular.copy(option.productionData) as IProductionData;
+		productionData.metadata.plannerLink = {
+			plannerPlanId: option.id,
+			saveSnapshotId: this.session?.id || '',
+			goalSlotId: option.strategy,
+			revision: 1,
+		};
+		const existingIndex = tabs.findIndex((tab) => tab.metadata?.plannerLink?.plannerPlanId === option.id);
+		if (existingIndex === -1) {
+			tabs.push(productionData);
+		} else {
+			tabs[existingIndex] = productionData;
+		}
 		this.dataStorageService.saveData(storageKey, tabs);
 		Strings.addNotification('Planner', 'Added "' + option.productionData.metadata.name + '" to the calculator.');
 		this.$state.go('production', {
@@ -259,24 +325,79 @@ export class AgentPlannerController
 		);
 	}
 
-	public generateCustomPlan(): void
+	public generateCustomPlan(slot?: ICustomGoalSlot): void
 	{
-		if (!this.session || !this.customTargetItem) {
+		slot = slot || this.customGoals[0];
+		if (!this.session || !slot || !slot.item) {
 			return;
 		}
-		const rate = Math.max(0.1, Number(this.customTargetRate) || 1);
-		this.customTargetRate = rate;
-		const option = this.planner.createCustomOption(this.session.state, this.$rootScope.version, this.customTargetItem, rate);
+		const rate = Math.max(0.1, Number(slot.rate) || 1);
+		slot.rate = rate;
+		const option = this.planner.createCustomOption(this.session.state, this.$rootScope.version, slot.item, rate, slot.strategy);
 		this.session.options = this.session.options.filter((candidate) => {
-			return candidate.strategy !== 'planD';
+			return candidate.strategy !== slot?.strategy;
 		});
 		this.session.options.push(option);
-		this.customOption = option;
+		slot.option = option;
+		if (slot.strategy === 'planD') {
+			this.customOption = option;
+		}
 		this.selectedOption = option;
 		this.mapOption = option;
 		this.session.selectedOptionId = option.id;
 		this.saveSessions();
-		Strings.addNotification('Planner', 'Generated custom Plan D for "' + option.targetDisplay + '".');
+		Strings.addNotification('Planner', 'Generated ' + option.planLabel + ' for "' + option.targetDisplay + '".');
+	}
+
+	public adjustCustomRate(slot: ICustomGoalSlot, delta: number): void
+	{
+		slot.rate = Math.max(0.1, Math.round((Number(slot.rate || 0) + delta) * 10) / 10);
+	}
+
+	public adjustOptionRate(option: IFactoryPlanOption, delta: number, event?: Event): void
+	{
+		event?.stopPropagation();
+		if (!this.session) {
+			return;
+		}
+		const replacement = this.planner.retargetOption(option, this.session.state, this.$rootScope.version, option.recommendedRate + delta);
+		if (this.session.recipePolicy.allowSamResourceConversion) {
+			replacement.productionData.request.blockedRecipes = replacement.productionData.request.blockedRecipes.filter((className) => !isSamResourceConversion(className));
+		}
+		if (this.session.recipePolicy.allowLockedRecipePreview) {
+			replacement.productionData.request.allowedAlternateRecipes = data.getAlternateRecipes().filter((recipe) => !isSamResourceConversion(recipe)).map((recipe) => recipe.className);
+		}
+		const index = this.session.options.indexOf(option);
+		if (index !== -1) {
+			this.session.options[index] = replacement;
+		}
+		this.selectedOption = replacement;
+		this.mapOption = replacement;
+		this.session.selectedOptionId = replacement.id;
+		this.saveSessions();
+	}
+
+	public toggleRecipePolicy(policy: 'allowLockedRecipePreview'|'allowSamResourceConversion'): void
+	{
+		if (!this.session) {
+			return;
+		}
+		this.session.recipePolicy[policy] = !this.session.recipePolicy[policy];
+		for (const option of this.session.options) {
+			const request = option.productionData.request;
+			if (this.session.recipePolicy.allowSamResourceConversion) {
+				request.blockedRecipes = request.blockedRecipes.filter((className) => !isSamResourceConversion(className));
+			} else {
+				request.blockedRecipes = Array.from(new Set([...request.blockedRecipes, ...getDefaultBlockedRecipes()]));
+			}
+			if (policy === 'allowLockedRecipePreview') {
+				request.allowedAlternateRecipes = this.session.recipePolicy.allowLockedRecipePreview
+					? data.getAlternateRecipes().filter((recipe) => !isSamResourceConversion(recipe)).map((recipe) => recipe.className)
+					: request.allowedAlternateRecipes.filter((className) => this.session?.state.availableRecipes.indexOf(className) !== -1);
+			}
+			option.request = {...option.request, ...angular.copy(request), gameVersion: option.request.gameVersion};
+		}
+		this.saveSessions();
 	}
 
 	public clearSessions(): void
@@ -346,6 +467,44 @@ export class AgentPlannerController
 	{
 		const coverage = this.getPotentialRate(option) / Math.max(0.01, option.recommendedRate);
 		return coverage >= 1 ? 'on-target' : coverage >= 0.5 ? 'behind' : 'critical';
+	}
+
+	public getEndgameParts(): IProjectAssemblyPartProgress[]
+	{
+		return this.session?.state.projectAssembly?.parts || [];
+	}
+
+	public getCapacityBarWidth(part: IProjectAssemblyPartProgress): number
+	{
+		return Math.max(2, Math.min(100, part.currentRate / Math.max(0.01, part.idealRate) * 100));
+	}
+
+	public getCapacityStatus(part: IProjectAssemblyPartProgress): string
+	{
+		const coverage = part.currentRate / Math.max(0.01, part.idealRate);
+		return coverage >= 1 ? 'on-target' : coverage >= 0.5 ? 'behind' : 'critical';
+	}
+
+	public getPartEstimate(part: IProjectAssemblyPartProgress): string
+	{
+		if (part.absoluteRemaining <= 0) {
+			return 'Complete';
+		}
+		return part.estimatedHours === null ? 'No capacity' : this.formatNumber(part.estimatedHours) + ' hr';
+	}
+
+	public getGoalKind(option: IFactoryPlanOption): string
+	{
+		if (option.strategy === 'planA') {
+			return 'Immediate progress';
+		}
+		if (option.strategy === 'planB') {
+			return 'Capacity gap';
+		}
+		if (option.strategy === 'planC') {
+			return 'Endgame bottleneck';
+		}
+		return 'Custom goal';
 	}
 
 	public getCurrentPhaseParts(): IProjectAssemblyPartProgress[]
@@ -552,6 +711,15 @@ export class AgentPlannerController
 	{
 		const loaded = this.dataStorageService.loadData(this.storageKey, []) as IPlannerSession[];
 		this.sessions = Array.isArray(loaded) ? loaded.map((session) => this.refreshSessionIfNeeded(session)) : [];
+		this.loadSessionsFromIndexedDb().then((indexedSessions) => {
+			if (!indexedSessions.length || indexedSessions[0]?.createdAt === this.sessions[0]?.createdAt) {
+				return;
+			}
+			this.$timeout(0).then(() => {
+				this.sessions = indexedSessions.map((session) => this.refreshSessionIfNeeded(session));
+				this.selectSession(this.sessions[0]);
+			});
+		}).catch(() => undefined);
 		if (!this.sessions.length) {
 			this.createStarterSession();
 			this.saveSessions();
@@ -570,9 +738,12 @@ export class AgentPlannerController
 			return !!option.map && option.map.bounds && option.map.bounds.maxX - option.map.bounds.minX < 700000;
 		});
 		const missingPlannerState = !session.state.inventoryTotals || !session.state.buildingCounts || !session.state.worldResourceNodes || !session.state.resourceWells;
-		const missingDashboardState = !session.planningHorizonHours || session.options.some((option) => {
+		const missingDashboardState = !session.recipePolicy
+			|| !session.planningHorizonHours
+			|| !!session.state.projectAssembly?.parts.some((part) => typeof part.idealRate !== 'number')
+			|| session.options.some((option) => {
 			return !option.candidateClusters || !option.applicableResources || !option.quantityBasis || !option.map?.candidates;
-		});
+			});
 		if (!shouldRefreshMapBounds && !missingPlannerState && !missingDashboardState) {
 			return session;
 		}
@@ -580,10 +751,11 @@ export class AgentPlannerController
 		const selectedStrategy = session.options.find((option) => {
 			return option.id === session.selectedOptionId;
 		})?.strategy || null;
-		const refreshed = this.planner.createSession(session.state, this.$rootScope.version, session.planningHorizonHours || 10);
+		const refreshed = this.planner.createSession(session.state, this.$rootScope.version, session.planningHorizonHours || 40);
 		refreshed.id = session.id;
 		refreshed.createdAt = session.createdAt;
 		refreshed.notes = session.notes || refreshed.notes;
+		refreshed.recipePolicy = session.recipePolicy || refreshed.recipePolicy;
 		if (selectedStrategy) {
 			const selectedOption = refreshed.options.find((option) => {
 				return option.strategy === selectedStrategy;
@@ -609,7 +781,52 @@ export class AgentPlannerController
 				option.result = null;
 			}
 		}
-		this.dataStorageService.saveData(this.storageKey, serializable);
+		this.dataStorageService.saveData(this.storageKey, serializable.slice(0, 2));
+		this.saveSessionsToIndexedDb(serializable).catch(() => undefined);
+	}
+
+	private openPlannerDatabase(): Promise<IDBDatabase>
+	{
+		return new Promise((resolve, reject) => {
+			if (!window.indexedDB) {
+				reject(new Error('IndexedDB is unavailable.'));
+				return;
+			}
+			const request = window.indexedDB.open('satisfactory-tools-planner', 1);
+			request.onupgradeneeded = () => {
+				const database = request.result;
+				if (!database.objectStoreNames.contains('sessions')) {
+					database.createObjectStore('sessions');
+				}
+			};
+			request.onsuccess = () => resolve(request.result);
+			request.onerror = () => reject(request.error || new Error('Could not open planner storage.'));
+		});
+	}
+
+	private saveSessionsToIndexedDb(sessions: IPlannerSession[]): Promise<void>
+	{
+		return this.openPlannerDatabase().then((database) => new Promise<void>((resolve, reject) => {
+			const transaction = database.transaction('sessions', 'readwrite');
+			transaction.objectStore('sessions').put(sessions, this.storageKey);
+			transaction.oncomplete = () => {
+				database.close();
+				resolve();
+			};
+			transaction.onerror = () => reject(transaction.error || new Error('Could not save planner sessions.'));
+		}));
+	}
+
+	private loadSessionsFromIndexedDb(): Promise<IPlannerSession[]>
+	{
+		return this.openPlannerDatabase().then((database) => new Promise<IPlannerSession[]>((resolve, reject) => {
+			const request = database.transaction('sessions', 'readonly').objectStore('sessions').get(this.storageKey);
+			request.onsuccess = () => {
+				database.close();
+				resolve(Array.isArray(request.result) ? request.result : []);
+			};
+			request.onerror = () => reject(request.error || new Error('Could not load planner sessions.'));
+		}));
 	}
 
 	private getProductionStorageKey(): string
@@ -621,6 +838,22 @@ export class AgentPlannerController
 			return 'production-ficsmas';
 		}
 		return 'tmpProduction';
+	}
+
+	private applyLinkedCalculatorChanges(session: IPlannerSession): void
+	{
+		const links = this.dataStorageService.loadData('plannerLinkedPlans-' + this.$rootScope.version, {}) as {[planId: string]: {request: any, revision: number}};
+		for (const option of session.options || []) {
+			const link = links[option.id];
+			if (!link || !link.request) {
+				continue;
+			}
+			option.productionData.request = angular.copy(link.request);
+			const production = link.request.production?.[0];
+			if (production && production.item === option.targetItems[0]) {
+				option.recommendedRate = Math.max(0.1, Number(production.amount) || option.recommendedRate);
+			}
+		}
 	}
 
 	private attachSaveInputChangeHandler(): void

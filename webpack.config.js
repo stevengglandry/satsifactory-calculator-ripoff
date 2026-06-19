@@ -2,13 +2,17 @@ const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
 const ESLintPlugin = require('eslint-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const webpack = require('webpack');
+const path = require('path');
 
 module.exports = {
 	mode: 'development',
-	entry: './src/app.ts',
+	entry: {
+		app: './src/app.ts',
+		'planner-save-worker': './src/AgentPlanner/PlannerSaveWorker.ts',
+	},
 	output: {
-		path: __dirname,
-		filename: './www/assets/app.js'
+		path: path.resolve(__dirname, 'www/assets'),
+		filename: '[name].js'
 	},
 	plugins: [
 		new webpack.IgnorePlugin({

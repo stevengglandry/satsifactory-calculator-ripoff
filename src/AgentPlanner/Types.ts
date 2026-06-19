@@ -2,7 +2,7 @@ import {IProductionData, IProductionDataApiRequest} from '@src/Tools/Production/
 import {ProductionResult} from '@src/Tools/Production/Result/ProductionResult';
 import {IProjectAssemblyProgress} from '@src/AgentPlanner/ProjectAssembly';
 
-export type PlannerStrategyId = 'planA'|'planB'|'planC'|'planD'|'fastestUnlock'|'throughputOutpost'|'infrastructureFirst';
+export type PlannerStrategyId = 'planA'|'planB'|'planC'|'planD'|'planE'|'fastestUnlock'|'throughputOutpost'|'infrastructureFirst';
 export type ResourcePurity = 'impure'|'normal'|'pure';
 export type PlannerConfidence = 'high'|'inferred'|'unknown';
 
@@ -83,9 +83,15 @@ export interface IResourceStatus
 export interface ITransportRoutePoint
 {
 	id: string;
-	type: 'trainStation'|'trainTrack'|'truckStop'|'truckPath';
+	type: 'trainStation'|'trainTrack'|'truckStop'|'truckPath'|'dronePort'|'hypertube';
 	name: string;
 	location: IMapPoint;
+}
+
+export interface IPlannerRecipePolicy
+{
+	allowLockedRecipePreview: boolean;
+	allowSamResourceConversion: boolean;
 }
 
 export interface IAgentGameState
@@ -107,6 +113,7 @@ export interface IAgentGameState
 	projectAssembly: IProjectAssemblyProgress|null;
 	availableRecipes: string[];
 	unlockedSchematics: string[];
+	activeSchematic: string|null;
 	inventoryTotals: {[item: string]: number};
 	buildingCounts: {[buildingClassName: string]: number};
 	notes: string[];
@@ -226,6 +233,7 @@ export interface IPlannerSession
 	state: IAgentGameState;
 	options: IFactoryPlanOption[];
 	planningHorizonHours: number;
+	recipePolicy: IPlannerRecipePolicy;
 	selectedOptionId: string|null;
 	notes: string[];
 }

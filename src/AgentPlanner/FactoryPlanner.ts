@@ -20,6 +20,7 @@ import {IProductionData, IProductionDataApiRequest, IProductionDataRequest} from
 import {ProductionResultFactory} from '@src/Tools/Production/Result/ProductionResultFactory';
 import {IRecipeSchema} from '@src/Schema/IRecipeSchema';
 import {IMinerSchema} from '@src/Schema/IMinerSchema';
+import {getDefaultBlockedRecipes, isSamResourceConversion} from '@src/AgentPlanner/RecipePolicy';
 
 interface IStrategyConfig
 {
@@ -31,7 +32,7 @@ interface IStrategyConfig
 	type: string;
 	amount: number;
 	ratio: number;
-	planLabel: 'Plan A'|'Plan B'|'Plan C'|'Plan D';
+	planLabel: 'Plan A'|'Plan B'|'Plan C'|'Plan D'|'Plan E';
 	targetReason: string;
 	directRemaining: number;
 	absoluteRemaining: number;
@@ -77,10 +78,11 @@ export class FactoryPlanner
 		'Desc_SpaceElevatorPart_12_C',
 	];
 
-	public createSession(state: IAgentGameState, version: string, planningHorizonHours: number = 10): IPlannerSession
+	public createSession(state: IAgentGameState, version: string, planningHorizonHours: number = 40): IPlannerSession
 	{
 		state = this.normalizeState(state);
 		planningHorizonHours = this.normalizePlanningHorizon(planningHorizonHours);
+		this.applyCapacityTargets(state, planningHorizonHours);
 		const targets = this.chooseProjectAssemblyTargets(state);
 		const configs = targets.map((target, index) => {
 			return this.createStrategyConfig(target, index, planningHorizonHours);
@@ -97,6 +99,10 @@ export class FactoryPlanner
 			state: state,
 			options: options,
 			planningHorizonHours: planningHorizonHours,
+			recipePolicy: {
+				allowLockedRecipePreview: false,
+				allowSamResourceConversion: false,
+			},
 			selectedOptionId: null,
 			notes: [
 				'Plans use save-derived resource nodes when available and the checked-in catalog only as a fallback.',
@@ -157,20 +163,21 @@ export class FactoryPlanner
 		return lines.join('\n');
 	}
 
-	public createCustomOption(state: IAgentGameState, version: string, item: string, rate: number): IFactoryPlanOption
+	public createCustomOption(state: IAgentGameState, version: string, item: string, rate: number, strategy: 'planD'|'planE' = 'planD'): IFactoryPlanOption
 	{
 		state = this.normalizeState(state);
 		const clampedRate = Math.max(0.1, Math.min(9999, rate || 1));
+		const planLabel = strategy === 'planE' ? 'Plan E' : 'Plan D';
 		const config: IStrategyConfig = {
-			id: 'planD',
-			label: 'Plan D: ' + this.getItemName(item),
+			id: strategy,
+			label: planLabel + ': ' + this.getItemName(item),
 			summary: 'Custom target selected by the user.',
 			radius: 75000,
 			targetItems: [item],
 			type: Constants.PRODUCTION_TYPE.PER_MINUTE,
 			amount: clampedRate,
 			ratio: 100,
-			planLabel: 'Plan D',
+			planLabel: planLabel,
 			targetReason: 'Custom wildcard target and production rate.',
 			directRemaining: 0,
 			absoluteRemaining: 0,
@@ -205,6 +212,30 @@ export class FactoryPlanner
 		const candidates = this.chooseClusters(config, requiredResources, state);
 		const cluster = candidates.find((candidate) => candidate.id === candidateId) || candidates[0];
 		return this.createOption(config, state, version, cluster, candidates);
+	}
+
+	public retargetOption(option: IFactoryPlanOption, state: IAgentGameState, version: string, rate: number): IFactoryPlanOption
+	{
+		state = this.normalizeState(state);
+		const clampedRate = Math.max(0.1, Math.min(9999, Math.round(rate * 10) / 10));
+		const config: IStrategyConfig = {
+			id: option.strategy,
+			label: option.strategyLabel,
+			summary: option.summary,
+			radius: option.strategy === 'planA' ? 55000 : option.strategy === 'planB' ? 85000 : option.strategy === 'planD' || option.strategy === 'planE' ? 75000 : 70000,
+			targetItems: option.targetItems,
+			type: Constants.PRODUCTION_TYPE.PER_MINUTE,
+			amount: clampedRate,
+			ratio: 100,
+			planLabel: option.planLabel as IStrategyConfig['planLabel'],
+			targetReason: option.targetReason,
+			directRemaining: option.directRemaining,
+			absoluteRemaining: option.absoluteRemaining,
+			recommendedRate: clampedRate,
+			quantityBasis: option.quantityBasis,
+			confidence: option.confidence,
+		};
+		return this.createOption(config, state, version, option.cluster, option.candidateClusters);
 	}
 
 	private createOption(
@@ -308,18 +339,24 @@ export class FactoryPlanner
 
 		const selected: IProjectAssemblyTarget[] = [];
 		const used: {[item: string]: boolean} = {};
+		const milestoneTarget = this.getActiveMilestoneTarget(state);
 		const directTarget = progressParts.find((part) => {
 			return part.directRemaining > 0;
 		}) || progressParts.find((part) => {
 			return part.absoluteRemaining > 0;
 		}) || progressParts[0];
-		selected.push(this.createProjectTarget(directTarget, 'Plan A', 'Next direct Space Elevator delivery needed for phase progression.'));
-		used[directTarget.item] = true;
+		if (milestoneTarget) {
+			selected.push({...milestoneTarget, planLabel: 'Plan A'});
+			used[milestoneTarget.item] = true;
+		} else {
+			selected.push(this.createProjectTarget(directTarget, 'Plan A', 'Next direct Space Elevator delivery needed for phase progression.'));
+			used[directTarget.item] = true;
+		}
 
 		const downstreamTargets = progressParts.filter((part) => {
 			return !used[part.item] && part.absoluteRemaining > 0;
 		}).sort((partA, partB) => {
-			return partB.absoluteRemaining - partA.absoluteRemaining;
+			return partB.capacityGap / Math.max(0.01, partB.idealRate) - partA.capacityGap / Math.max(0.01, partA.idealRate);
 		});
 		const downstreamTarget = downstreamTargets[0] || progressParts.find((part) => {
 			return !used[part.item];
@@ -345,10 +382,47 @@ export class FactoryPlanner
 		return selected;
 	}
 
+	private getActiveMilestoneTarget(state: IAgentGameState): IProjectAssemblyTarget|null
+	{
+		if (!state.activeSchematic || state.unlockedSchematics.indexOf(state.activeSchematic) !== -1) {
+			return null;
+		}
+		const schematic = data.getRawData().schematics[state.activeSchematic];
+		if (!schematic || !schematic.cost?.length) {
+			return null;
+		}
+		const gaps = schematic.cost.map((cost) => ({
+			item: cost.item,
+			remaining: Math.max(0, cost.amount - (state.inventoryTotals[cost.item] || 0)),
+			currentRate: state.productionRates[cost.item]?.potentialRate || 0,
+		})).filter((entry) => entry.remaining > 0 && !!this.getPreferredRecipeForItem(entry.item, state)).sort((a, b) => {
+			const hoursA = a.currentRate > 0 ? a.remaining / a.currentRate : Number.MAX_SAFE_INTEGER;
+			const hoursB = b.currentRate > 0 ? b.remaining / b.currentRate : Number.MAX_SAFE_INTEGER;
+			return hoursB - hoursA;
+		});
+		if (!gaps.length) {
+			return null;
+		}
+		const gap = gaps[0];
+		return {
+			item: gap.item,
+			planLabel: 'Plan A',
+			reason: 'Active milestone blocker for ' + schematic.name + '.',
+			directRemaining: gap.remaining,
+			absoluteRemaining: gap.remaining,
+			recommendedRate: 0,
+			currentRate: gap.currentRate,
+			confidence: 'high',
+		};
+	}
+
 	private createStrategyConfig(target: IProjectAssemblyTarget, index: number, planningHorizonHours: number): IStrategyConfig
 	{
 		const ids: PlannerStrategyId[] = ['planA', 'planB', 'planC'];
 		const radius = index === 0 ? 55000 : index === 1 ? 85000 : 70000;
+		const remaining = index === 0 && target.directRemaining > 0 ? target.directRemaining : target.absoluteRemaining;
+		const idealRate = this.getRecommendedRate(remaining, planningHorizonHours);
+		const additionalRate = Math.max(0.1, Math.round(Math.max(0, idealRate - target.currentRate) * 100) / 100);
 		return {
 			id: ids[index] || 'planC',
 			label: target.planLabel + ': ' + this.getItemName(target.item),
@@ -356,13 +430,13 @@ export class FactoryPlanner
 			radius: radius,
 			targetItems: [target.item],
 			type: Constants.PRODUCTION_TYPE.PER_MINUTE,
-			amount: this.getRecommendedRate(index === 0 && target.directRemaining > 0 ? target.directRemaining : target.absoluteRemaining, planningHorizonHours),
+			amount: additionalRate,
 			ratio: 100,
 			planLabel: target.planLabel,
 			targetReason: target.reason,
 			directRemaining: target.directRemaining,
 			absoluteRemaining: target.absoluteRemaining,
-			recommendedRate: this.getRecommendedRate(index === 0 && target.directRemaining > 0 ? target.directRemaining : target.absoluteRemaining, planningHorizonHours),
+			recommendedRate: additionalRate,
 			quantityBasis: index === 0 && target.directRemaining > 0 ? 'direct' : 'absolute',
 			confidence: target.confidence,
 		};
@@ -399,6 +473,9 @@ export class FactoryPlanner
 			directRemaining: Math.max(0, directRequired - currentStock),
 			absoluteTotal: requirement.absoluteTotal,
 			absoluteRemaining: Math.max(0, requirement.absoluteTotal - currentStock),
+			idealRate: 0,
+			capacityGap: 0,
+			estimatedHours: null,
 			nextPhase: null,
 			confidence: 'unknown',
 		};
@@ -414,6 +491,7 @@ export class FactoryPlanner
 			directRemaining: part.directRemaining,
 			absoluteRemaining: part.absoluteRemaining,
 			recommendedRate: this.getRecommendedRate(remaining),
+			currentRate: part.currentRate,
 			confidence: part.confidence,
 		};
 	}
@@ -458,7 +536,20 @@ export class FactoryPlanner
 
 	private normalizePlanningHorizon(value: number): number
 	{
-		return [5, 10, 20, 40].indexOf(Number(value)) !== -1 ? Number(value) : 10;
+		return [10, 20, 40, 80].indexOf(Number(value)) !== -1 ? Number(value) : 40;
+	}
+
+	private applyCapacityTargets(state: IAgentGameState, planningHorizonHours: number): void
+	{
+		if (!state.projectAssembly) {
+			return;
+		}
+		state.projectAssembly.planningHorizonHours = planningHorizonHours;
+		for (const part of state.projectAssembly.parts) {
+			part.idealRate = this.getRecommendedRate(part.absoluteRemaining, planningHorizonHours);
+			part.capacityGap = Math.max(0, Math.round((part.idealRate - part.currentRate) * 100) / 100);
+			part.estimatedHours = part.currentRate > 0 ? Math.round(part.absoluteRemaining / part.currentRate * 10 / 60) / 10 : null;
+		}
 	}
 
 	private hasUnlockedRecipeForItem(item: string, state: IAgentGameState): boolean
@@ -677,7 +768,7 @@ export class FactoryPlanner
 
 		const allowedAlternates = state.availableRecipes.filter((className) => {
 			const recipe = data.getRawData().recipes[className];
-			return !!recipe && recipe.alternate;
+			return !!recipe && recipe.alternate && !isSamResourceConversion(recipe);
 		});
 
 		return {
@@ -687,7 +778,7 @@ export class FactoryPlanner
 			blockedResources: Object.keys(resourceMax).filter((item) => {
 				return item !== Constants.WATER_CLASSNAME && resourceMax[item] <= 0;
 			}),
-			blockedRecipes: [],
+			blockedRecipes: getDefaultBlockedRecipes(),
 			blockedMachines: [],
 			allowedAlternateRecipes: allowedAlternates,
 			sinkableResources: [],
@@ -1006,11 +1097,15 @@ export class FactoryPlanner
 			transportRoutes: state.transportRoutes || [],
 			projectAssembly: state.projectAssembly ? {
 				...state.projectAssembly,
+				completedPhase: typeof state.projectAssembly.completedPhase === 'number'
+					? state.projectAssembly.completedPhase
+					: Math.max(0, (state.projectAssembly.currentPhase || 1) - 1),
 				targetPhase: state.projectAssembly.targetPhase || null,
 				phaseSource: state.projectAssembly.phaseSource || 'inferred',
 			} : null,
 			availableRecipes: state.availableRecipes || [],
 			unlockedSchematics: state.unlockedSchematics || [],
+			activeSchematic: state.activeSchematic || null,
 			inventoryTotals: state.inventoryTotals || {},
 			buildingCounts: state.buildingCounts || {},
 			notes: state.notes || [],

@@ -16,12 +16,16 @@ export interface IProjectAssemblyPartProgress
 	directRemaining: number;
 	absoluteTotal: number;
 	absoluteRemaining: number;
+	idealRate: number;
+	capacityGap: number;
+	estimatedHours: number|null;
 	nextPhase: number|null;
 	confidence: 'high'|'inferred'|'unknown';
 }
 
 export interface IProjectAssemblyProgress
 {
+	completedPhase: number;
 	currentPhase: number;
 	targetPhase: number|null;
 	totalAbsoluteQuota: number;
@@ -29,6 +33,7 @@ export interface IProjectAssemblyProgress
 	parts: IProjectAssemblyPartProgress[];
 	confidence: 'high'|'inferred'|'unknown';
 	phaseSource: 'save'|'inferred';
+	planningHorizonHours?: number;
 	notes: string[];
 }
 
@@ -40,6 +45,7 @@ export interface IProjectAssemblyTarget
 	directRemaining: number;
 	absoluteRemaining: number;
 	recommendedRate: number;
+	currentRate: number;
 	confidence: 'high'|'inferred'|'unknown';
 }
 

@@ -1,4 +1,4 @@
-import {Parser, SaveComponent, SaveEntity, SatisfactorySave} from '@etothepii/satisfactory-file-parser';
+import type {SaveComponent, SaveEntity, SatisfactorySave} from '@etothepii/satisfactory-file-parser';
 import data from '@src/Data/Data';
 import {
 	IAgentGameState,
@@ -20,14 +20,9 @@ type SaveObject = SaveEntity|SaveComponent;
 export class SaveGameStateExtractor
 {
 
-	public async extractFromFile(file: File, gameVersion: string): Promise<IAgentGameState>
+	public extractFromSave(save: SatisfactorySave, saveName: string, gameVersion: string): IAgentGameState
 	{
-		const buffer = await file.arrayBuffer();
-		const parsed = Parser.ParseSave(file.name.replace(/\.sav$/i, ''), buffer, {
-			throwErrors: false,
-		});
-
-		return this.extract(parsed, file.name, gameVersion);
+		return this.extract(save, saveName, gameVersion);
 	}
 
 	public createEmptyState(gameVersion: string): IAgentGameState
@@ -50,6 +45,7 @@ export class SaveGameStateExtractor
 			projectAssembly: this.createProjectAssemblyProgress({}, {}, null),
 			availableRecipes: [],
 			unlockedSchematics: [],
+			activeSchematic: null,
 			inventoryTotals: {},
 			buildingCounts: {},
 			notes: [
@@ -67,14 +63,17 @@ export class SaveGameStateExtractor
 		const worldResourceNodes = this.collectWorldResourceNodes(objects);
 		const resourceWells = this.collectResourceWells(objects);
 		const tappedNodes = this.findTappedNodes(objects, worldResourceNodes);
-		const classNameIndex = this.collectClassNameReferences(objects);
 		const rawData = data.getRawData();
-		const availableRecipes = Object.keys(classNameIndex).filter((className) => {
-			return className in rawData.recipes;
-		}).sort();
-		const unlockedSchematics = Object.keys(classNameIndex).filter((className) => {
-			return className in rawData.schematics;
-		}).sort();
+		const unlockedSchematics = this.collectPurchasedSchematics(objects);
+		const activeSchematic = this.collectActiveSchematic(objects);
+		const availableRecipeIndex: {[className: string]: boolean} = {};
+		for (const schematicClassName of unlockedSchematics) {
+			const schematic = rawData.schematics[schematicClassName];
+			for (const recipeClassName of schematic?.unlock?.recipes || []) {
+				availableRecipeIndex[recipeClassName] = true;
+			}
+		}
+		const availableRecipes = Object.keys(availableRecipeIndex).filter((className) => className in rawData.recipes).sort();
 		const factoryClusters = this.buildFactoryClusters(buildingObjects);
 		const occupiedFactoryAreas = this.buildOccupiedFactoryAreas(buildingObjects);
 		const inventoryTotals = this.collectInventoryTotals(objects);
@@ -86,8 +85,8 @@ export class SaveGameStateExtractor
 		const projectAssembly = this.createProjectAssemblyProgress(inventoryTotals, productionRates, this.findGamePhase(objects));
 		const notes: string[] = [];
 
-		if (!availableRecipes.length) {
-			notes.push('No explicit unlocked recipe list was found in the parsed save; base recipes are used for planning.');
+		if (!unlockedSchematics.length) {
+			notes.push('No purchased schematic list was found in the parsed save; base recipes are used for planning.');
 		}
 		if (!tappedNodes.length) {
 			notes.push('No existing miners were matched to the starter node catalog; options treat selected nodes as new outposts.');
@@ -121,6 +120,7 @@ export class SaveGameStateExtractor
 			projectAssembly: projectAssembly,
 			availableRecipes: availableRecipes,
 			unlockedSchematics: unlockedSchematics,
+			activeSchematic: activeSchematic,
 			inventoryTotals: inventoryTotals,
 			buildingCounts: buildingCounts,
 			notes: notes,
@@ -569,6 +569,12 @@ export class SaveGameStateExtractor
 		if (/VehiclePath/i.test(className)) {
 			return 'truckPath';
 		}
+		if (/DroneStation|DroneTransport/i.test(className)) {
+			return 'dronePort';
+		}
+		if (/Hypertube|PipeHyper/i.test(className)) {
+			return 'hypertube';
+		}
 		return null;
 	}
 
@@ -599,7 +605,8 @@ export class SaveGameStateExtractor
 		phaseInfo: {currentPhase: number, targetPhase: number|null}|null,
 	): IProjectAssemblyProgress
 	{
-		let currentPhase = phaseInfo ? phaseInfo.currentPhase : 5;
+		let completedPhase = phaseInfo ? phaseInfo.currentPhase : 0;
+		let currentPhase = phaseInfo ? phaseInfo.targetPhase || Math.min(5, phaseInfo.currentPhase + 1) : 5;
 		if (!phaseInfo) {
 			for (let phaseIndex = 0; phaseIndex < 5; phaseIndex++) {
 				const phaseIsComplete = PROJECT_ASSEMBLY_REQUIREMENTS.every((requirement) => {
@@ -611,7 +618,9 @@ export class SaveGameStateExtractor
 					break;
 				}
 			}
+			completedPhase = Math.max(0, currentPhase - 1);
 		}
+		const completedDemand = this.calculateCompletedProjectDemand(completedPhase);
 
 		const parts: IProjectAssemblyPartProgress[] = PROJECT_ASSEMBLY_REQUIREMENTS.map((requirement) => {
 			const currentStock = inventoryTotals[requirement.item] || 0;
@@ -619,7 +628,7 @@ export class SaveGameStateExtractor
 				? requirement.phaseDeliveries[currentPhase - 1] || 0
 				: this.sumPhaseDeliveries(requirement.phaseDeliveries, currentPhase);
 			const directRemaining = Math.max(0, directRequiredThroughPhase - currentStock);
-			const absoluteRemaining = Math.max(0, requirement.absoluteTotal - currentStock);
+			const absoluteRemaining = Math.max(0, requirement.absoluteTotal - (completedDemand[requirement.item] || 0) - currentStock);
 			const nextPhaseIndex = requirement.phaseDeliveries.findIndex((amount, index) => {
 				return index + 1 >= currentPhase && amount > 0 && currentStock < this.sumPhaseDeliveries(requirement.phaseDeliveries, index + 1);
 			});
@@ -632,12 +641,16 @@ export class SaveGameStateExtractor
 				directRemaining: directRemaining,
 				absoluteTotal: requirement.absoluteTotal,
 				absoluteRemaining: absoluteRemaining,
+				idealRate: 0,
+				capacityGap: 0,
+				estimatedHours: null,
 				nextPhase: nextPhaseIndex === -1 ? null : nextPhaseIndex + 1,
 				confidence: 'inferred',
 			};
 		});
 
 		return {
+			completedPhase: completedPhase,
 			currentPhase: currentPhase,
 			targetPhase: phaseInfo ? phaseInfo.targetPhase : null,
 			totalAbsoluteQuota: PROJECT_ASSEMBLY_TOTAL_QUOTA,
@@ -653,6 +666,59 @@ export class SaveGameStateExtractor
 					: 'Project Assembly phase and progress are inferred from inventory because exact delivery fields were not exposed.',
 			],
 		};
+	}
+
+	private calculateCompletedProjectDemand(completedPhase: number): {[item: string]: number}
+	{
+		const result: {[item: string]: number} = {};
+		for (const requirement of PROJECT_ASSEMBLY_REQUIREMENTS) {
+			const directDelivered = requirement.phaseDeliveries.slice(0, completedPhase).reduce((sum, amount) => sum + amount, 0);
+			if (directDelivered > 0) {
+				this.collectProjectPartDemand(requirement.item, directDelivered, result, 0);
+			}
+		}
+		return result;
+	}
+
+	private collectProjectPartDemand(item: string, quantity: number, result: {[item: string]: number}, depth: number): void
+	{
+		if (depth > 12 || quantity <= 0) {
+			return;
+		}
+		result[item] = (result[item] || 0) + quantity;
+		const projectItems = new Set(PROJECT_ASSEMBLY_REQUIREMENTS.map((requirement) => requirement.item));
+		const recipe = Object.values(data.getRawData().recipes).find((candidate) => {
+			return candidate.inMachine && !candidate.alternate && candidate.products?.some((product) => product.item === item);
+		});
+		const productAmount = recipe?.products?.find((product) => product.item === item)?.amount || 0;
+		if (!recipe || productAmount <= 0) {
+			return;
+		}
+		for (const ingredient of recipe.ingredients || []) {
+			if (projectItems.has(ingredient.item)) {
+				this.collectProjectPartDemand(ingredient.item, quantity * ingredient.amount / productAmount, result, depth + 1);
+			}
+		}
+	}
+
+	private collectPurchasedSchematics(objects: SaveObject[]): string[]
+	{
+		const manager = objects.find((object) => /BP_SchematicManager\.BP_SchematicManager_C$/.test(object.typePath || ''));
+		const values = manager?.properties?.mPurchasedSchematics?.values || [];
+		const result: string[] = [];
+		for (const value of values) {
+			const className = this.getClassNameFromTypePath(value?.pathName || '');
+			if (className && result.indexOf(className) === -1) {
+				result.push(className);
+			}
+		}
+		return result.sort();
+	}
+
+	private collectActiveSchematic(objects: SaveObject[]): string|null
+	{
+		const manager = objects.find((object) => /BP_SchematicManager\.BP_SchematicManager_C$/.test(object.typePath || ''));
+		return this.getClassNameFromTypePath(manager?.properties?.mActiveSchematic?.value?.pathName || '');
 	}
 
 	private collectClassNameReferences(objects: SaveObject[]): {[key: string]: boolean}

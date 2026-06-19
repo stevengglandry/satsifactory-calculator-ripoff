@@ -7,6 +7,7 @@ import {Strings} from '@src/Utils/Strings';
 import {IItemSchema} from '@src/Schema/IItemSchema';
 import {Callbacks} from '@src/Utils/Callbacks';
 import {IProductionData, IProductionDataApiRequest, IProductionDataRequestInput, IProductionDataRequestItem, IProductionDataResourceNode} from '@src/Tools/Production/IProductionData';
+import {getDefaultBlockedRecipes} from '@src/AgentPlanner/RecipePolicy';
 import {ResultStatus} from '@src/Tools/Production/ResultStatus';
 import {Solver} from '@src/Solver/Solver';
 import {ProductionResult} from '@src/Tools/Production/Result/ProductionResult';
@@ -62,6 +63,13 @@ export class ProductionTab
 
 		if (typeof this.data.request.blockedMachines === 'undefined') {
 			this.data.request.blockedMachines = [];
+		}
+		if ((this.data.metadata.schemaVersion || 1) < 2) {
+			this.data.request.blockedRecipes = Array.from(new Set([
+				...(this.data.request.blockedRecipes || []),
+				...getDefaultBlockedRecipes(),
+			]));
+			this.data.metadata.schemaVersion = 2;
 		}
 		this.normalizeResourceNodes();
 		this.repairClearedResourceNodeLimits();
@@ -200,12 +208,12 @@ export class ProductionTab
 			metadata: {
 				name: null,
 				icon: null,
-				schemaVersion: 1,
+				schemaVersion: 2,
 				gameVersion: '0',
 			},
 			request: {
 				allowedAlternateRecipes: [],
-				blockedRecipes: [],
+				blockedRecipes: getDefaultBlockedRecipes(),
 				blockedMachines: [],
 				blockedResources: [],
 				sinkableResources: [],
@@ -609,7 +617,7 @@ export class ProductionTab
 	public setAllBasicRecipes(value: boolean): void
 	{
 		if (value) {
-			this.data.request.blockedRecipes = [];
+			this.data.request.blockedRecipes = getDefaultBlockedRecipes();
 		} else {
 			this.data.request.blockedRecipes = data.getBaseItemRecipes().map((recipe) => {
 				return recipe.className;
