@@ -5,8 +5,8 @@ import {DataProvider} from '@src/Data/DataProvider';
 import {FactoryPlanner} from '@src/AgentPlanner/FactoryPlanner';
 import {SaveGameStateExtractor} from '@src/AgentPlanner/SaveGameStateExtractor';
 import {PROJECT_ASSEMBLY_REQUIREMENTS, PROJECT_ASSEMBLY_TOTAL_QUOTA} from '@src/AgentPlanner/ProjectAssembly';
-import {Parser} from '@etothepii/satisfactory-file-parser';
 import {SAM_RESOURCE_CONVERSION_RECIPES, getDefaultBlockedRecipes} from '@src/AgentPlanner/RecipePolicy';
+import {parsePlannerSave} from '@src/AgentPlanner/PlannerSaveParser';
 
 function assert(condition: boolean, message: string): void
 {
@@ -71,8 +71,7 @@ async function checkSaveImport(filePath: string): Promise<void>
 		name: path.basename(absolutePath),
 		arrayBuffer: async () => bytes.buffer,
 	} as unknown as File;
-	const parsed = Parser.ParseSave(file.name.replace(/\.sav$/i, ''), await file.arrayBuffer(), {throwErrors: false});
-	const state = extractor.extractFromSave(parsed, file.name, '1.2');
+	const state = parsePlannerSave(file.name, await file.arrayBuffer(), '1.2');
 	assert(state.objectCount > 0, 'Imported save should expose parsed objects.');
 	assert(state.worldResourceNodes.length > 0, 'Imported save should expose randomized resource nodes.');
 	assert(state.worldResourceNodes.some((node) => node.source === 'save'), 'Imported save should use save-backed resource nodes.');

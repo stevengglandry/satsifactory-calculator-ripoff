@@ -1,5 +1,4 @@
-import {Parser} from '@etothepii/satisfactory-file-parser';
-import {SaveGameStateExtractor} from '@src/AgentPlanner/SaveGameStateExtractor';
+import {parsePlannerSave} from '@src/AgentPlanner/PlannerSaveParser';
 
 interface IPlannerSaveWorkerRequest
 {
@@ -12,8 +11,7 @@ const worker: any = self as any;
 worker.onmessage = (event: MessageEvent<IPlannerSaveWorkerRequest>) => {
 	try {
 		const request = event.data;
-		const parsed = Parser.ParseSave(request.fileName.replace(/\.sav$/i, ''), request.buffer, {throwErrors: false});
-		const state = new SaveGameStateExtractor().extractFromSave(parsed, request.fileName, request.gameVersion);
+		const state = parsePlannerSave(request.fileName, request.buffer, request.gameVersion);
 		worker.postMessage({ok: true, state: state});
 	} catch (error) {
 		worker.postMessage({ok: false, error: error instanceof Error ? error.message : String(error)});
