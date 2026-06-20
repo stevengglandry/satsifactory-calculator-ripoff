@@ -54,8 +54,8 @@
 				<button type="button" ng-click="ctrl.fitMapSelection()"><i class="fas fa-crosshairs"></i> Fit selection</button>
 			</div>
 			<div class="planner-map-toolbar">
-				<div class="planner-filter-group">
-					<button type="button" class="planner-tool-button" ng-click="ctrl.resourceFilterOpen = !ctrl.resourceFilterOpen" ng-class="{'is-active': ctrl.resourceFilterOpen}" title="Choose which resource node types are visible"><i class="fas fa-gem"></i> Resource nodes <strong>{{ctrl.getVisibleMapNodeCount()}}/{{ctrl.mapOption.map.nodes.length}}</strong></button>
+				<div class="planner-filter-group planner-resource-filter">
+					<button type="button" class="planner-tool-button planner-resource-trigger" ng-click="ctrl.resourceFilterOpen = !ctrl.resourceFilterOpen" ng-class="{'is-active': ctrl.resourceFilterOpen}" ng-attr-aria-expanded="{{ctrl.resourceFilterOpen}}" aria-haspopup="true" title="Choose which resource node types are visible"><i class="fas fa-gem"></i> Resource nodes <strong>{{ctrl.getVisibleMapNodeCount()}}/{{ctrl.mapOption.map.nodes.length}}</strong><i class="fas fa-caret-down planner-resource-caret"></i></button>
 					<div class="planner-resource-popover" ng-if="ctrl.resourceFilterOpen">
 						<div class="planner-resource-actions"><button type="button" ng-click="ctrl.setAllMapResources(true)">Show all</button><button type="button" ng-click="ctrl.showOnlyPlanResources()">Plan inputs</button><button type="button" ng-click="ctrl.setAllMapResources(false)">Hide all</button></div>
 						<button type="button" ng-repeat="option in ctrl.getMapResourceOptions() track by option.item" ng-click="ctrl.toggleResource(option.item)" ng-class="{'is-off': ctrl.mapFilters.resources[option.item] === false, 'is-plan-input': option.applicable}"><item-icon item="option.item" size="20" hide-tooltip="true"></item-icon><span>{{option.name}}<small>{{option.total - option.tapped}} untapped · {{option.tapped}} tapped</small></span><i class="fas" ng-class="ctrl.mapFilters.resources[option.item] === false ? 'fa-eye-slash' : 'fa-eye'"></i></button>

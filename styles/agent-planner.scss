@@ -469,19 +469,33 @@ body.agent-planner-page ui-view[name="content"] {
 	.planner-fit-button { margin-left: auto; }
 
 	.planner-filter-group { position: relative; flex: 0 0 auto; }
+	.planner-resource-filter { z-index: 1001; }
+	.planner-resource-trigger {
+		position: relative;
+		z-index: 2;
+
+		&.is-active {
+			border-color: var(--planner-cyan);
+			border-bottom-color: #172a3a;
+			background: #172a3a;
+		}
+	}
+	.planner-resource-caret { margin-left: 5px; color: var(--planner-muted); font-size: 0.65rem; }
 	.planner-layer-tools { display: flex; gap: 4px; }
 	.planner-availability-toggle { margin-left: auto; }
 
 	.planner-resource-popover {
 		position: absolute;
-		top: calc(100% + 7px);
-		left: 0;
-		z-index: 1000;
+		top: calc(100% - 1px);
+		left: -1px;
+		z-index: 1;
 		display: grid;
 		width: 280px;
+		max-width: calc(100vw - 24px);
 		max-height: 330px;
 		padding: 6px;
-		border: 1px solid var(--planner-line);
+		border: 1px solid var(--planner-cyan);
+		border-radius: 0 3px 3px 3px;
 		background: #172a3a;
 		box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
 		overflow-y: auto;
