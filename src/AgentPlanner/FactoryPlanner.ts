@@ -832,10 +832,8 @@ export class FactoryPlanner
 		const selectedIds = new Set(selectedNodes.map((node) => node.id));
 		const tappedIds = new Set(tappedNodes.map((node) => node.id));
 		const applicableItems = new Set(requiredResources);
-		const nodes = worldNodes.filter((node) => {
-			return applicableItems.has(node.item);
-		}).map((node) => {
-			return this.createMapNode(node, bounds, tappedIds.has(node.id), selectedIds.has(node.id), true);
+		const nodes = worldNodes.map((node) => {
+			return this.createMapNode(node, bounds, tappedIds.has(node.id), selectedIds.has(node.id), applicableItems.has(node.item));
 		});
 		const candidateOverlays = candidates.map((candidate, index) => {
 			return {
@@ -886,6 +884,8 @@ export class FactoryPlanner
 			tapped: tapped,
 			selected: selected,
 			applicable: applicable,
+			source: node.source || 'catalog',
+			note: node.note,
 		};
 	}
 

@@ -260,7 +260,31 @@ export class SaveGameStateExtractor
 			});
 		}
 
-		return nodes.length ? nodes : WORLD_RESOURCE_NODES.map((node) => ({...node, source: 'catalog'}));
+		return nodes.length ? this.mergeSaveAndCatalogNodes(nodes) : WORLD_RESOURCE_NODES.map((node) => ({...node, source: 'catalog'}));
+	}
+
+	private mergeSaveAndCatalogNodes(saveNodes: IWorldResourceNode[]): IWorldResourceNode[]
+	{
+		const catalogNodes = WORLD_RESOURCE_NODES.map((node) => ({...node, source: 'catalog' as const}));
+		const replacedCatalogIds = new Set<string>();
+		for (const saveNode of saveNodes) {
+			let closest: IWorldResourceNode|null = null;
+			let closestDistance = 1800;
+			for (const catalogNode of catalogNodes) {
+				if (replacedCatalogIds.has(catalogNode.id)) {
+					continue;
+				}
+				const distance = this.distance(saveNode.location, catalogNode.location);
+				if (distance < closestDistance) {
+					closest = catalogNode;
+					closestDistance = distance;
+				}
+			}
+			if (closest) {
+				replacedCatalogIds.add(closest.id);
+			}
+		}
+		return saveNodes.concat(catalogNodes.filter((node) => !replacedCatalogIds.has(node.id)));
 	}
 
 	private collectResourceWells(objects: SaveObject[]): IWorldResourceWell[]

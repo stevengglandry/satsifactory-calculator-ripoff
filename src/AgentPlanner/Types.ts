@@ -151,6 +151,8 @@ export interface IMapOverlayNode
 	tapped: boolean;
 	selected: boolean;
 	applicable: boolean;
+	source: 'save'|'catalog';
+	note?: string;
 }
 
 export interface IMapOverlayCandidate

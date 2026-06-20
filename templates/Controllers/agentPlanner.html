@@ -54,25 +54,35 @@
 				<button type="button" ng-click="ctrl.fitMapSelection()"><i class="fas fa-crosshairs"></i> Fit selection</button>
 			</div>
 			<div class="planner-map-toolbar">
-				<button type="button" ng-click="ctrl.resourceFilterOpen = !ctrl.resourceFilterOpen" ng-class="{'is-active': ctrl.resourceFilterOpen}"><i class="fas fa-gem"></i> Resources</button>
-				<button type="button" ng-click="ctrl.toggleMapFilter('showFactories')" ng-class="{'is-active': ctrl.mapFilters.showFactories}"><i class="fas fa-industry"></i> Factories</button>
-				<button type="button" ng-click="ctrl.toggleMapFilter('showRail')" ng-class="{'is-active': ctrl.mapFilters.showRail}"><i class="fas fa-train"></i> Rail</button>
-				<button type="button" ng-click="ctrl.toggleMapFilter('showTrucks')" ng-class="{'is-active': ctrl.mapFilters.showTrucks}"><i class="fas fa-truck"></i> Trucks</button>
-				<button type="button" ng-click="ctrl.toggleMapFilter('showDrones')" ng-class="{'is-active': ctrl.mapFilters.showDrones}"><i class="fas fa-helicopter"></i> Drones</button>
-				<button type="button" ng-click="ctrl.toggleMapFilter('showHypertubes')" ng-class="{'is-active': ctrl.mapFilters.showHypertubes}"><i class="fas fa-circle-notch"></i> Hypertubes</button>
-				<button type="button" ng-click="ctrl.toggleMapFilter('untappedOnly')" ng-class="{'is-active': ctrl.mapFilters.untappedOnly}">Untapped only</button>
-				<span class="planner-purity-tools">Purity
-					<button type="button" ng-click="ctrl.togglePurity('impure')" ng-class="{'is-off': !ctrl.mapFilters.purities.impure}">I</button>
-					<button type="button" ng-click="ctrl.togglePurity('normal')" ng-class="{'is-off': !ctrl.mapFilters.purities.normal}">N</button>
-					<button type="button" ng-click="ctrl.togglePurity('pure')" ng-class="{'is-off': !ctrl.mapFilters.purities.pure}">P</button>
+				<div class="planner-filter-group">
+					<button type="button" class="planner-tool-button" ng-click="ctrl.resourceFilterOpen = !ctrl.resourceFilterOpen" ng-class="{'is-active': ctrl.resourceFilterOpen}" title="Choose which resource node types are visible"><i class="fas fa-gem"></i> Resource nodes <strong>{{ctrl.getVisibleMapNodeCount()}}/{{ctrl.mapOption.map.nodes.length}}</strong></button>
+					<div class="planner-resource-popover" ng-if="ctrl.resourceFilterOpen">
+						<div class="planner-resource-actions"><button type="button" ng-click="ctrl.setAllMapResources(true)">Show all</button><button type="button" ng-click="ctrl.showOnlyPlanResources()">Plan inputs</button><button type="button" ng-click="ctrl.setAllMapResources(false)">Hide all</button></div>
+						<button type="button" ng-repeat="option in ctrl.getMapResourceOptions() track by option.item" ng-click="ctrl.toggleResource(option.item)" ng-class="{'is-off': ctrl.mapFilters.resources[option.item] === false, 'is-plan-input': option.applicable}"><item-icon item="option.item" size="20" hide-tooltip="true"></item-icon><span>{{option.name}}<small>{{option.total - option.tapped}} untapped · {{option.tapped}} tapped</small></span><i class="fas" ng-class="ctrl.mapFilters.resources[option.item] === false ? 'fa-eye-slash' : 'fa-eye'"></i></button>
+					</div>
+				</div>
+				<div class="planner-layer-tools" aria-label="Map overlays">
+					<button type="button" class="planner-tool-button" ng-click="ctrl.toggleMapFilter('showFactories')" ng-class="{'is-active': ctrl.mapFilters.showFactories}" title="Factory clusters from this save"><i class="fas fa-industry"></i> Factories</button>
+					<button type="button" class="planner-tool-button" ng-click="ctrl.toggleMapFilter('showRail')" ng-class="{'is-active': ctrl.mapFilters.showRail}" title="Train stations and tracks"><i class="fas fa-train"></i> Rail</button>
+					<button type="button" class="planner-tool-button" ng-click="ctrl.toggleMapFilter('showTrucks')" ng-class="{'is-active': ctrl.mapFilters.showTrucks}" title="Truck stations and inferred routes"><i class="fas fa-truck"></i> Trucks</button>
+					<button type="button" class="planner-tool-button" ng-click="ctrl.toggleMapFilter('showDrones')" ng-class="{'is-active': ctrl.mapFilters.showDrones}" title="Drone ports and inferred links"><i class="fas fa-helicopter"></i> Drones</button>
+					<button type="button" class="planner-tool-button" ng-click="ctrl.toggleMapFilter('showHypertubes')" ng-class="{'is-active': ctrl.mapFilters.showHypertubes}" title="Hypertube entrances and inferred links"><i class="fas fa-circle-notch"></i> Tubes</button>
+				</div>
+				<button type="button" class="planner-tool-button planner-availability-toggle" ng-click="ctrl.toggleMapFilter('untappedOnly')" ng-class="{'is-active': ctrl.mapFilters.untappedOnly}" title="Switch between every node and only unclaimed nodes"><i class="fas" ng-class="ctrl.mapFilters.untappedOnly ? 'fa-toggle-on' : 'fa-toggle-off'"></i> {{ctrl.mapFilters.untappedOnly ? 'Untapped only' : 'All availability'}}</button>
+				<span class="planner-purity-tools"><span>Purity</span>
+					<button type="button" ng-click="ctrl.togglePurity('impure')" ng-class="{'is-off': !ctrl.mapFilters.purities.impure}"><i class="planner-purity-dot is-impure"></i>Impure</button>
+					<button type="button" ng-click="ctrl.togglePurity('normal')" ng-class="{'is-off': !ctrl.mapFilters.purities.normal}"><i class="planner-purity-dot is-normal"></i>Normal</button>
+					<button type="button" ng-click="ctrl.togglePurity('pure')" ng-class="{'is-off': !ctrl.mapFilters.purities.pure}"><i class="planner-purity-dot is-pure"></i>Pure</button>
 				</span>
-			</div>
-			<div class="planner-resource-popover" ng-if="ctrl.resourceFilterOpen">
-				<button type="button" ng-repeat="item in ctrl.selectedOption.applicableResources" ng-click="ctrl.toggleResource(item)" ng-class="{'is-off': ctrl.mapFilters.resources[item] === false}"><item-icon item="item" size="20" hide-tooltip="true"></item-icon>{{ctrl.getItemName(item)}}</button>
 			</div>
 			<div class="planner-map-frame">
 				<planner-map map-data="ctrl.mapOption.map" image-url="ctrl.worldMapImage" factory-areas="ctrl.session.state.occupiedFactoryAreas" routes="ctrl.session.state.transportRoutes" filters="ctrl.mapFilters" on-candidate-select="ctrl.selectCandidate(candidateId)"></planner-map>
-				<div class="planner-map-legend"><span><i class="planner-legend-dot is-selected"></i>Selected</span><span><i class="planner-legend-dot is-applicable"></i>Untapped</span><span><i class="planner-legend-dot is-tapped"></i>Tapped</span><span><i class="planner-legend-factory"></i>Factories</span></div>
+				<div class="planner-map-legend">
+					<div class="planner-legend-heading"><strong>Node key</strong><small>{{ctrl.isApproximateMap() ? 'Standard map fallback' : 'Save data overrides · catalog fills missing locations'}}</small></div>
+					<div class="planner-legend-grid"><span><i class="planner-legend-dot is-selected"></i>Selected for plan</span><span><i class="planner-legend-dot is-applicable"></i>Plan input</span><span><i class="planner-legend-dot is-untapped"></i>Untapped</span><span><i class="planner-legend-dot is-tapped"></i>Tapped</span></div>
+					<div class="planner-legend-purity"><span><i class="planner-purity-dot is-impure"></i>Impure</span><span><i class="planner-purity-dot is-normal"></i>Normal</span><span><i class="planner-purity-dot is-pure"></i>Pure</span><span><i class="planner-legend-factory"></i>Factory area</span></div>
+					<small class="planner-legend-hint">Hover any node for resource, purity, capacity and availability.</small>
+				</div>
 			</div>
 			<div class="planner-candidate-bar">
 				<span>Location candidates</span>

@@ -75,6 +75,7 @@ async function checkSaveImport(filePath: string): Promise<void>
 	assert(state.objectCount > 0, 'Imported save should expose parsed objects.');
 	assert(state.worldResourceNodes.length > 0, 'Imported save should expose randomized resource nodes.');
 	assert(state.worldResourceNodes.some((node) => node.source === 'save'), 'Imported save should use save-backed resource nodes.');
+	assert(state.worldResourceNodes.some((node) => node.source === 'catalog'), 'Imported save should supplement unserialized locations from the catalog.');
 	assert(state.projectAssembly?.phaseSource === 'save', 'Imported save should expose the current phase from the save.');
 	assert(state.projectAssembly?.completedPhase === 3, 'Imported save should expose phase 3 as completed.');
 	assert(state.projectAssembly?.currentPhase === 4, 'Imported save should expose phase 4 as active.');
@@ -88,5 +89,7 @@ async function checkSaveImport(filePath: string): Promise<void>
 	for (const option of importedSession.options) {
 		assert(option.candidateClusters.length === 3, option.planLabel + ' should expose three location candidates.');
 		assert(option.selectedResourceNodes.length > 0, option.planLabel + ' should select save-backed resource nodes.');
+		assert(option.map.nodes.length === state.worldResourceNodes.length, option.planLabel + ' should expose every save-backed resource node on the map.');
+		assert(option.map.nodes.some((node) => !node.applicable), option.planLabel + ' should retain non-plan resources for map exploration.');
 	}
 }

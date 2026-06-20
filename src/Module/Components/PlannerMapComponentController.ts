@@ -30,6 +30,7 @@ export class PlannerMapComponentController implements IComponentController
 	private nodeLayer = L.layerGroup();
 	private candidateLayer = L.layerGroup();
 	private contextLayer = L.layerGroup();
+	private nodeRenderer = L.canvas({padding: 0.5});
 	private lastFitRequest = -1;
 
 	public static $inject = ['$element', '$scope', '$timeout'];
@@ -117,18 +118,26 @@ export class PlannerMapComponentController implements IComponentController
 			if (!this.isNodeVisible(node)) {
 				continue;
 			}
-			const color = node.selected ? '#61dff5' : node.tapped ? '#a2abb4' : '#f4f6f8';
+			const color = node.selected ? '#61dff5' : node.applicable ? '#f4f6f8' : node.tapped ? '#7f8c97' : '#c9d2d9';
 			const marker = L.circleMarker(this.toLatLng(node), {
-				radius: node.selected ? 7 : 4.5,
+				renderer: this.nodeRenderer,
+				radius: node.selected ? 7 : node.applicable ? 5 : 3.5,
 				color: color,
-				weight: node.selected ? 3 : 1.5,
+				weight: node.selected ? 3 : node.applicable ? 2 : 1,
 				fillColor: this.getPurityColor(node.purity),
-				fillOpacity: node.selected ? 1 : 0.72,
-				opacity: node.tapped ? 0.65 : 1,
+				fillOpacity: node.selected ? 1 : node.applicable ? 0.88 : 0.68,
+				opacity: node.tapped ? 0.58 : 1,
 			});
-			marker.bindTooltip(node.itemName + ' · ' + node.purity + ' · ' + this.formatRate(node.rate) + '/min' + (node.tapped ? ' · tapped' : ''), {
+			const sourceLabel = node.source === 'save' ? 'Save-file node' : 'Standard map node';
+			const statusLabel = node.tapped ? 'Tapped' : 'Untapped';
+			marker.bindTooltip(
+				'<strong>' + node.itemName + '</strong>'
+				+ '<span>' + this.capitalize(node.purity) + ' purity · ' + this.formatRate(node.rate) + '/min</span>'
+				+ '<small>' + statusLabel + ' · ' + sourceLabel + (node.applicable ? ' · Needed by this plan' : '') + '</small>', {
 				direction: 'top',
-				offset: [0, -6],
+				offset: [0, -5],
+				className: 'planner-resource-tooltip',
+				sticky: true,
 			});
 			marker.addTo(this.nodeLayer);
 		}
@@ -295,5 +304,10 @@ export class PlannerMapComponentController implements IComponentController
 	private formatRate(value: number): string
 	{
 		return isFinite(value) ? value.toFixed(1).replace(/\.0$/, '') : '0';
+	}
+
+	private capitalize(value: string): string
+	{
+		return value.charAt(0).toUpperCase() + value.slice(1);
 	}
 }

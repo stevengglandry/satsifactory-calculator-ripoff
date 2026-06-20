@@ -74,6 +74,8 @@ export class AgentPlannerController
 	private plannerActionsCache: IPlannerAction[] = [];
 	private plannerActionsOption: IFactoryPlanOption|null = null;
 	private plannerActionsSession: IPlannerSession|null = null;
+	private mapResourceOptionsMap: IFactoryPlanOption|null = null;
+	private mapResourceOptionsCache: Array<{item: string, name: string, total: number, tapped: number, applicable: boolean}> = [];
 
 	public static $inject = ['$timeout', '$scope', 'DataStorageService', '$state', '$rootScope'];
 
@@ -255,8 +257,50 @@ export class AgentPlannerController
 
 	public toggleResource(item: string): void
 	{
-		this.mapFilters.resources[item] = !this.mapFilters.resources[item];
+		this.mapFilters.resources[item] = this.mapFilters.resources[item] === false;
 		this.touchMapFilters();
+	}
+
+	public getMapResourceOptions(): Array<{item: string, name: string, total: number, tapped: number, applicable: boolean}>
+	{
+		if (this.mapResourceOptionsMap === this.mapOption) {
+			return this.mapResourceOptionsCache;
+		}
+		const options: {[item: string]: {item: string, name: string, total: number, tapped: number, applicable: boolean}} = {};
+		for (const node of this.mapOption?.map.nodes || []) {
+			if (!options[node.item]) {
+				options[node.item] = {item: node.item, name: node.itemName, total: 0, tapped: 0, applicable: false};
+			}
+			options[node.item].total++;
+			options[node.item].tapped += node.tapped ? 1 : 0;
+			options[node.item].applicable = options[node.item].applicable || node.applicable;
+		}
+		this.mapResourceOptionsMap = this.mapOption;
+		this.mapResourceOptionsCache = Object.values(options).sort((a, b) => Number(b.applicable) - Number(a.applicable) || a.name.localeCompare(b.name));
+		return this.mapResourceOptionsCache;
+	}
+
+	public setAllMapResources(visible: boolean): void
+	{
+		for (const option of this.getMapResourceOptions()) {
+			this.mapFilters.resources[option.item] = visible;
+		}
+		this.touchMapFilters();
+	}
+
+	public showOnlyPlanResources(): void
+	{
+		for (const option of this.getMapResourceOptions()) {
+			this.mapFilters.resources[option.item] = option.applicable;
+		}
+		this.touchMapFilters();
+	}
+
+	public getVisibleMapNodeCount(): number
+	{
+		return (this.mapOption?.map.nodes || []).filter((node) => this.mapFilters.resources[node.item] !== false
+			&& this.mapFilters.purities[node.purity] !== false
+			&& (!this.mapFilters.untappedOnly || !node.tapped || node.selected)).length;
 	}
 
 	public toggleMapFilter(filter: 'untappedOnly'|'showFactories'|'showRoutes'|'showRail'|'showTrucks'|'showDrones'|'showHypertubes'): void
@@ -742,7 +786,9 @@ export class AgentPlannerController
 			|| !session.planningHorizonHours
 			|| !!session.state.projectAssembly?.parts.some((part) => typeof part.idealRate !== 'number')
 			|| session.options.some((option) => {
-			return !option.candidateClusters || !option.applicableResources || !option.quantityBasis || !option.map?.candidates;
+			return !option.candidateClusters || !option.applicableResources || !option.quantityBasis || !option.map?.candidates
+				|| option.map.nodes.length !== session.state.worldResourceNodes.length
+				|| option.map.nodes.some((node) => !node.source);
 			});
 		if (!shouldRefreshMapBounds && !missingPlannerState && !missingDashboardState) {
 			return session;
