@@ -86,6 +86,9 @@ async function checkSaveImport(filePath: string): Promise<void>
 
 	const importedSession = planner.createSession(state, '1.2');
 	assert(importedSession.options.length === 3, 'Imported save should create three planner options.');
+	assert(importedSession.options[0].targetItems[0] === 'Desc_SpaceElevatorPart_6_C', 'Imported phase 4 save should recommend Magnetic Field Generator as Plan A.');
+	assert(importedSession.options[1].targetItems[0] === 'Desc_SpaceElevatorPart_9_C', 'Imported phase 4 save should recommend Nuclear Pasta as the strongest runway gap.');
+	assert(importedSession.options.every((option) => option.confidence !== 'unknown'), 'Imported save should use save-derived Project Assembly targets instead of fallback targets.');
 	for (const option of importedSession.options) {
 		assert(option.candidateClusters.length === 3, option.planLabel + ' should expose three location candidates.');
 		assert(option.selectedResourceNodes.length > 0, option.planLabel + ' should select save-backed resource nodes.');

@@ -354,19 +354,24 @@ export class FactoryPlanner
 		}
 
 		const downstreamTargets = progressParts.filter((part) => {
-			return !used[part.item] && part.absoluteRemaining > 0;
+			return !used[part.item] && part.absoluteRemaining > 0 && part.capacityGap > 0;
 		}).sort((partA, partB) => {
-			return partB.capacityGap / Math.max(0.01, partB.idealRate) - partA.capacityGap / Math.max(0.01, partA.idealRate);
+			return this.compareRunwayPriority(partA, partB);
 		});
 		const downstreamTarget = downstreamTargets[0] || progressParts.find((part) => {
 			return !used[part.item];
 		}) || directTarget;
-		selected.push(this.createProjectTarget(downstreamTarget, 'Plan B', 'Largest remaining absolute cumulative quota deficit.'));
+		selected.push(this.createProjectTarget(downstreamTarget, 'Plan B', 'Largest positive endgame runway gap not covered by Plan A.'));
 		used[downstreamTarget.item] = true;
 
 		const catchupTargets = progressParts.filter((part) => {
 			return !used[part.item] && part.absoluteRemaining > 0;
 		}).sort((partA, partB) => {
+			const directA = partA.directRemaining > 0 ? 1 : 0;
+			const directB = partB.directRemaining > 0 ? 1 : 0;
+			if (directA !== directB) {
+				return directB - directA;
+			}
 			const rateA = partA.currentRate > 0 ? 1 : 0;
 			const rateB = partB.currentRate > 0 ? 1 : 0;
 			if (rateA !== rateB) {
@@ -380,6 +385,29 @@ export class FactoryPlanner
 		selected.push(this.createProjectTarget(catchupTarget, 'Plan C', 'Useful downstream or catch-up Project Assembly target not covered by Plans A or B.'));
 
 		return selected;
+	}
+
+	private compareRunwayPriority(partA: IProjectAssemblyPartProgress, partB: IProjectAssemblyPartProgress): number
+	{
+		const directA = partA.directRemaining > 0 ? 1 : 0;
+		const directB = partB.directRemaining > 0 ? 1 : 0;
+		if (directA !== directB) {
+			return directB - directA;
+		}
+		const gapDiff = partB.capacityGap - partA.capacityGap;
+		if (Math.abs(gapDiff) > 0.001) {
+			return gapDiff;
+		}
+		const absoluteDiff = partB.absoluteRemaining - partA.absoluteRemaining;
+		if (Math.abs(absoluteDiff) > 0.001) {
+			return absoluteDiff;
+		}
+		const phaseA = partA.nextPhase || Number.MAX_SAFE_INTEGER;
+		const phaseB = partB.nextPhase || Number.MAX_SAFE_INTEGER;
+		if (phaseA !== phaseB) {
+			return phaseA - phaseB;
+		}
+		return this.projectPartOrder.indexOf(partA.item) - this.projectPartOrder.indexOf(partB.item);
 	}
 
 	private getActiveMilestoneTarget(state: IAgentGameState): IProjectAssemblyTarget|null
@@ -498,13 +526,10 @@ export class FactoryPlanner
 
 	private isAutoProjectPartEligible(part: IProjectAssemblyPartProgress, state: IAgentGameState): boolean
 	{
-		if (this.hasUnlockedRecipeForItem(part.item, state)) {
+		if (part.directRemaining > 0 || part.capacityGap > 0 || part.currentStock > 0 || part.currentRate > 0) {
 			return true;
 		}
-		if (state.availableRecipes.length) {
-			return false;
-		}
-		if (part.currentStock > 0 || part.currentRate > 0) {
+		if (this.hasUnlockedRecipeForItem(part.item, state)) {
 			return true;
 		}
 		const currentPhase = state.projectAssembly?.currentPhase || 1;
