@@ -782,9 +782,14 @@ export class AgentPlannerController
 			return !!option.map && option.map.bounds && option.map.bounds.maxX - option.map.bounds.minX < 700000;
 		});
 		const missingPlannerState = !session.state.inventoryTotals || !session.state.buildingCounts || !session.state.worldResourceNodes || !session.state.resourceWells;
+		const staleProjectAssemblyTargets = session.state.projectAssembly?.phaseSource === 'save' && session.options.some((option) => {
+			return (option.strategy === 'planA' || option.strategy === 'planB' || option.strategy === 'planC')
+				&& (option.confidence === 'unknown' || option.targetReason === 'Largest remaining absolute cumulative quota deficit.');
+		});
 		const missingDashboardState = !session.recipePolicy
 			|| !session.planningHorizonHours
 			|| !!session.state.projectAssembly?.parts.some((part) => typeof part.idealRate !== 'number')
+			|| staleProjectAssemblyTargets
 			|| session.options.some((option) => {
 			return !option.candidateClusters || !option.applicableResources || !option.quantityBasis || !option.map?.candidates
 				|| option.map.nodes.length !== session.state.worldResourceNodes.length
