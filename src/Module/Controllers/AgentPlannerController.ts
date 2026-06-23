@@ -11,6 +11,7 @@ import {Strings} from '@src/Utils/Strings';
 import {IProductionData} from '@src/Tools/Production/IProductionData';
 import {AppPath} from '@src/Utils/AppPath';
 import {getDefaultBlockedRecipes, isSamResourceConversion} from '@src/AgentPlanner/RecipePolicy';
+import {createPlannerRecipeContext, getPlannerRecipeContextStorageKey} from '@src/AgentPlanner/RecipeAvailability';
 
 interface IPlannerTargetOption
 {
@@ -186,6 +187,7 @@ export class AgentPlannerController
 		this.selectedOption = session.options.find((option) => option.id === session.selectedOptionId) || session.options[0] || null;
 		this.mapOption = this.selectedOption;
 		this.syncResourceFilters();
+		this.savePlannerRecipeContext(session);
 	}
 
 	public selectOption(option: IFactoryPlanOption): void
@@ -327,6 +329,9 @@ export class AgentPlannerController
 
 	public openAsCalculatorTab(option: IFactoryPlanOption): void
 	{
+		if (this.session) {
+			this.savePlannerRecipeContext(this.session);
+		}
 		const storageKey = this.getProductionStorageKey();
 		const tabs = this.dataStorageService.loadData(storageKey, []) as IProductionData[];
 		const productionData = angular.copy(option.productionData) as IProductionData;
@@ -889,6 +894,17 @@ export class AgentPlannerController
 			return 'production-ficsmas';
 		}
 		return 'tmpProduction';
+	}
+
+	private savePlannerRecipeContext(session: IPlannerSession): void
+	{
+		if (!session.state.availableRecipes.length || session.state.saveName === 'No save loaded') {
+			return;
+		}
+		this.dataStorageService.saveData(
+			getPlannerRecipeContextStorageKey(this.$rootScope.version),
+			createPlannerRecipeContext(session.state, session.id),
+		);
 	}
 
 	private applyLinkedCalculatorChanges(session: IPlannerSession): void

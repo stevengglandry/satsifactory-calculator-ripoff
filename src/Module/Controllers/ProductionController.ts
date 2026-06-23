@@ -14,6 +14,7 @@ import {IBuildingSchema} from '@src/Schema/IBuildingSchema';
 import {FileExporter} from '@src/Export/FileExporter';
 import {Strings} from '@src/Utils/Strings';
 import {IRootScope} from '@src/Types/IRootScope';
+import {getPlannerRecipeContextStorageKey, IPlannerRecipeContext, normalizeAllowedAlternateRecipes} from '@src/AgentPlanner/RecipeAvailability';
 
 export class ProductionController
 {
@@ -189,11 +190,12 @@ export class ProductionController
 		this.addingInProgress = true;
 		this.$timeout(0).then(() => {
 			const tab = new ProductionTab(this.scope, this.$rootScope.version);
+			this.applyPlannerRecipeDefaults(tab);
 			this.tabs.push(tab);
 			this.tab = tab;
 			this.addingInProgress = false;
+			this.saveState();
 		});
-		this.saveState();
 	}
 
 	public cloneTab(tab: ProductionTab): void
@@ -284,7 +286,9 @@ export class ProductionController
 			this.addEmptyTab();
 		} else {
 			for (const item of loaded) {
-				this.tabs.push(new ProductionTab(this.scope, this.$rootScope.version, item));
+				const tab = new ProductionTab(this.scope, this.$rootScope.version, item);
+				this.applyPlannerRecipeDefaults(tab);
+				this.tabs.push(tab);
 			}
 			if (this.tabs.length) {
 				this.tab = this.tabs[0];
@@ -292,6 +296,30 @@ export class ProductionController
 				this.addEmptyTab();
 			}
 		}
+	}
+
+	private applyPlannerRecipeDefaults(tab: ProductionTab): void
+	{
+		if (!this.isBlankCalculatorTab(tab)) {
+			return;
+		}
+		const context = this.dataStorageService.loadData(
+			getPlannerRecipeContextStorageKey(this.$rootScope.version),
+			null,
+		) as IPlannerRecipeContext|null;
+		const allowedAlternateRecipes = normalizeAllowedAlternateRecipes(context?.allowedAlternateRecipes || []);
+		if (allowedAlternateRecipes.length) {
+			tab.data.request.allowedAlternateRecipes = allowedAlternateRecipes;
+		}
+	}
+
+	private isBlankCalculatorTab(tab: ProductionTab): boolean
+	{
+		return !tab.data.metadata.name
+			&& !tab.data.metadata.plannerLink
+			&& !tab.data.request.allowedAlternateRecipes.length
+			&& !tab.data.request.input.some((input) => !!input.item)
+			&& !tab.data.request.production.some((product) => !!product.item);
 	}
 
 }

@@ -63,17 +63,9 @@ export class SaveGameStateExtractor
 		const worldResourceNodes = this.collectWorldResourceNodes(objects);
 		const resourceWells = this.collectResourceWells(objects);
 		const tappedNodes = this.findTappedNodes(objects, worldResourceNodes);
-		const rawData = data.getRawData();
 		const unlockedSchematics = this.collectPurchasedSchematics(objects);
 		const activeSchematic = this.collectActiveSchematic(objects);
-		const availableRecipeIndex: {[className: string]: boolean} = {};
-		for (const schematicClassName of unlockedSchematics) {
-			const schematic = rawData.schematics[schematicClassName];
-			for (const recipeClassName of schematic?.unlock?.recipes || []) {
-				availableRecipeIndex[recipeClassName] = true;
-			}
-		}
-		const availableRecipes = Object.keys(availableRecipeIndex).filter((className) => className in rawData.recipes).sort();
+		const availableRecipes = this.collectAvailableRecipes(objects, unlockedSchematics);
 		const factoryClusters = this.buildFactoryClusters(buildingObjects);
 		const occupiedFactoryAreas = this.buildOccupiedFactoryAreas(buildingObjects);
 		const inventoryTotals = this.collectInventoryTotals(objects);
@@ -731,12 +723,38 @@ export class SaveGameStateExtractor
 		const values = manager?.properties?.mPurchasedSchematics?.values || [];
 		const result: string[] = [];
 		for (const value of values) {
-			const className = this.getClassNameFromTypePath(value?.pathName || '');
+			const className = this.getClassNameFromReference(value);
 			if (className && result.indexOf(className) === -1) {
 				result.push(className);
 			}
 		}
 		return result.sort();
+	}
+
+	private collectAvailableRecipes(objects: SaveObject[], unlockedSchematics: string[]): string[]
+	{
+		const rawData = data.getRawData();
+		const availableRecipeIndex: {[className: string]: boolean} = {};
+		const addRecipe = (className: string|null) => {
+			if (className && className in rawData.recipes) {
+				availableRecipeIndex[className] = true;
+			}
+		};
+
+		for (const schematicClassName of unlockedSchematics) {
+			const schematic = rawData.schematics[schematicClassName];
+			for (const recipeClassName of schematic?.unlock?.recipes || []) {
+				addRecipe(recipeClassName);
+			}
+		}
+
+		const manager = objects.find((object) => /FGRecipeManager$/.test(object.typePath || ''));
+		const values = manager?.properties?.mAvailableRecipes?.values || [];
+		for (const value of values) {
+			addRecipe(this.getClassNameFromReference(value));
+		}
+
+		return Object.keys(availableRecipeIndex).sort();
 	}
 
 	private collectActiveSchematic(objects: SaveObject[]): string|null
@@ -847,6 +865,23 @@ export class SaveGameStateExtractor
 		}
 		const parts = typePath.split('/');
 		return parts.length ? parts[parts.length - 1] : null;
+	}
+
+	private getClassNameFromReference(value: any): string|null
+	{
+		if (!value) {
+			return null;
+		}
+		if (typeof value === 'string') {
+			return this.getClassNameFromTypePath(value);
+		}
+		return this.getClassNameFromReference(
+			value.pathName
+			|| value.value?.pathName
+			|| value.value?.itemReference?.pathName
+			|| value.itemReference?.pathName
+			|| '',
+		);
 	}
 
 	private sanitizeId(value: string): string

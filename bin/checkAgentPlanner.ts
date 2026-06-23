@@ -7,6 +7,7 @@ import {SaveGameStateExtractor} from '@src/AgentPlanner/SaveGameStateExtractor';
 import {PROJECT_ASSEMBLY_REQUIREMENTS, PROJECT_ASSEMBLY_TOTAL_QUOTA} from '@src/AgentPlanner/ProjectAssembly';
 import {SAM_RESOURCE_CONVERSION_RECIPES, getDefaultBlockedRecipes} from '@src/AgentPlanner/RecipePolicy';
 import {parsePlannerSave} from '@src/AgentPlanner/PlannerSaveParser';
+import {getUnlockedAlternateRecipes} from '@src/AgentPlanner/RecipeAvailability';
 
 function assert(condition: boolean, message: string): void
 {
@@ -80,7 +81,10 @@ async function checkSaveImport(filePath: string): Promise<void>
 	assert(state.projectAssembly?.completedPhase === 3, 'Imported save should expose phase 3 as completed.');
 	assert(state.projectAssembly?.currentPhase === 4, 'Imported save should expose phase 4 as active.');
 	assert(state.unlockedSchematics.length > 0, 'Imported save should expose purchased schematics.');
-	assert(state.availableRecipes.length > 0, 'Imported save should derive available recipes from purchased schematics.');
+	assert(state.availableRecipes.length > 500, 'Imported save should derive available recipes from the save recipe manager.');
+	const unlockedAlternateRecipes = getUnlockedAlternateRecipes(state);
+	assert(unlockedAlternateRecipes.length >= 10, 'Imported save should expose unlocked alternate recipes.');
+	assert(unlockedAlternateRecipes.indexOf('Recipe_Alternate_CircuitBoard_1_C') !== -1, 'Imported save should include unlocked alternate recipes from the save.');
 	assert(Object.keys(state.productionRates).length > 0, 'Imported save should expose production capacity.');
 	assert(Object.values(state.productionRates).every((entry) => entry.potentialRate > 0), 'Production capacities should be positive.');
 
@@ -90,6 +94,9 @@ async function checkSaveImport(filePath: string): Promise<void>
 	assert(importedSession.options[1].targetItems[0] === 'Desc_SpaceElevatorPart_9_C', 'Imported phase 4 save should recommend Nuclear Pasta as the strongest runway gap.');
 	assert(importedSession.options.every((option) => option.confidence !== 'unknown'), 'Imported save should use save-derived Project Assembly targets instead of fallback targets.');
 	for (const option of importedSession.options) {
+		const optionAllowedAlternates = option.productionData.request.allowedAlternateRecipes;
+		assert(unlockedAlternateRecipes.every((className) => optionAllowedAlternates.indexOf(className) !== -1), option.planLabel + ' should allow every unlocked alternate recipe from the save.');
+		assert(optionAllowedAlternates.every((className) => unlockedAlternateRecipes.indexOf(className) !== -1), option.planLabel + ' should not enable locked alternate recipes by default.');
 		assert(option.candidateClusters.length === 3, option.planLabel + ' should expose three location candidates.');
 		assert(option.selectedResourceNodes.length > 0, option.planLabel + ' should select save-backed resource nodes.');
 		assert(option.map.nodes.length === state.worldResourceNodes.length, option.planLabel + ' should expose every save-backed resource node on the map.');

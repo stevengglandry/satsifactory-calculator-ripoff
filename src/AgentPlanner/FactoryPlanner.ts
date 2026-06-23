@@ -20,7 +20,8 @@ import {IProductionData, IProductionDataApiRequest, IProductionDataRequest} from
 import {ProductionResultFactory} from '@src/Tools/Production/Result/ProductionResultFactory';
 import {IRecipeSchema} from '@src/Schema/IRecipeSchema';
 import {IMinerSchema} from '@src/Schema/IMinerSchema';
-import {getDefaultBlockedRecipes, isSamResourceConversion} from '@src/AgentPlanner/RecipePolicy';
+import {getDefaultBlockedRecipes} from '@src/AgentPlanner/RecipePolicy';
+import {getUnlockedAlternateRecipes} from '@src/AgentPlanner/RecipeAvailability';
 
 interface IStrategyConfig
 {
@@ -791,10 +792,7 @@ export class FactoryPlanner
 			resourceMax[node.item] = (resourceMax[node.item] || 0) + this.getNodeRate(node);
 		}
 
-		const allowedAlternates = state.availableRecipes.filter((className) => {
-			const recipe = data.getRawData().recipes[className];
-			return !!recipe && recipe.alternate && !isSamResourceConversion(recipe);
-		});
+		const allowedAlternates = getUnlockedAlternateRecipes(state);
 
 		return {
 			gameVersion: this.getApiVersion(version),
